@@ -14,10 +14,9 @@
 #include <iostream>
 #include <thread>
 
-#include "N2U_Server.h"
 #include "../CTMutexSet.h"
-#include "../ASIOLib/Executor.h"
-#include "../ASIOLib/SerialPort.h"
+#include "N2U_Server.h"
+#include "../ASIOLib/SerialRW.h"
 
 std::string strTMP;
 
@@ -166,108 +165,6 @@ void PopNetData(ClassMutexList<CMTCharArray> &dataList)
 	}
 }
 
-typedef boost::tuple<boost::posix_time::time_duration::tick_type, std::vector<unsigned char>> WriteBufferElement;
-
-class SerialReader : private boost::noncopyable, public boost::enable_shared_from_this<SerialReader> {
-	boost::shared_ptr<ASIOLib::SerialPort> _serialPort;
-	std::string _portName;
-	unsigned int _baudRate;
-	boost::posix_time::ptime _lastRead;
-
-	std::vector<WriteBufferElement> _writeBuffer;
-	bool _noTimeOffsets;
-
-	void OnRead(boost::asio::io_service &ios, const std::vector<unsigned char> &buffer, size_t bytesRead);
-
-public:
-	SerialReader(const std::string &portName, int baudRate, const std::vector<WriteBufferElement> &writeBuffer, bool noTimeOffsets) :
-		_portName(portName), _baudRate(baudRate), _writeBuffer(writeBuffer), _noTimeOffsets(noTimeOffsets) {}
-	void Create(boost::asio::io_service &ios) {
-		try {
-			_serialPort.reset(new ASIOLib::SerialPort(ios, _portName));
-			_serialPort->Open(boost::bind(&SerialReader::OnRead, shared_from_this(), _1, _2, _3), _baudRate);
-		}
-		catch (const std::exception &e) {
-			std::cout << e.what() << std::endl;
-		}
-
-		// post the creation, so Run() executes immediately - threads can start to work on what the func is posting, rather than waiting until all work is queued
-		ios.post([=, &ios] {
-			uint64_t startTime = 0;
-			std::for_each(_writeBuffer.begin(), _writeBuffer.end(),
-				[&](const WriteBufferElement &e) {
-				// if noTimeOffsets, just write the buffer, otherwise create a timer to write the buffer in the future
-				if (_noTimeOffsets)
-					_serialPort->Write(e.get<1>());
-				else {
-					startTime += e.get<0>();
-					const boost::shared_ptr<boost::asio::deadline_timer> timer(new boost::asio::deadline_timer(ios));
-					timer->expires_from_now(boost::posix_time::milliseconds(startTime));
-					timer->async_wait([=](const boost::system::error_code &ec) {
-						boost::shared_ptr<boost::asio::deadline_timer> t(timer); // need this to keep the timer object alive
-						_serialPort->Write(e.get<1>());
-					});
-				}
-			}
-			);
-		});
-	}
-};
-
-
-void SerialReader::OnRead(boost::asio::io_service &, const std::vector<unsigned char> &buffer, size_t bytesRead) {
-	const boost::posix_time::ptime now = boost::posix_time::microsec_clock::universal_time();
-
-	if (_lastRead == boost::posix_time::not_a_date_time)
-		_lastRead = now;
-
-	const std::vector<unsigned char> v(buffer.begin(), buffer.begin() + bytesRead);
-
-	const uint64_t offset = (now - _lastRead).total_milliseconds();
-	//*_oa << offset << v;
-
-	_lastRead = now;
-
-	std::copy(v.begin(), v.end(), std::ostream_iterator<unsigned char>(std::cout, ""));
-}
-
-class SerialWriter : private boost::noncopyable, public boost::enable_shared_from_this<SerialWriter> {
-	boost::shared_ptr<ASIOLib::SerialPort> _serialPort;
-	std::string _portName;
-	unsigned int _baudRate;
-	std::vector<WriteBufferElement> _writeBuffer;
-	bool _noTimeOffsets;
-public:
-	SerialWriter(const std::string &portName, int baudRate, const std::vector<WriteBufferElement> &writeBuffer, bool noTimeOffsets) :
-		_portName(portName), _baudRate(baudRate), _writeBuffer(writeBuffer), _noTimeOffsets(noTimeOffsets) {}
-
-	void Create(boost::asio::io_service &ios) {
-		_serialPort.reset(new ASIOLib::SerialPort(ios, _portName));
-		_serialPort->Open(0, _baudRate);
-
-		// post the creation, so Run() executes immediately - threads can start to work on what the func is posting, rather than waiting until all work is queued
-		ios.post([=, &ios] {
-			uint64_t startTime = 0;
-			std::for_each(_writeBuffer.begin(), _writeBuffer.end(),
-				[&](const WriteBufferElement &e) {
-				// if noTimeOffsets, just write the buffer, otherwise create a timer to write the buffer in the future
-				if (_noTimeOffsets)
-					_serialPort->Write(e.get<1>());
-				else {
-					startTime += e.get<0>();
-					const boost::shared_ptr<boost::asio::deadline_timer> timer(new boost::asio::deadline_timer(ios));
-					timer->expires_from_now(boost::posix_time::milliseconds(startTime));
-					timer->async_wait([=](const boost::system::error_code &ec) {
-						boost::shared_ptr<boost::asio::deadline_timer> t(timer); // need this to keep the timer object alive
-						_serialPort->Write(e.get<1>());
-					});
-				}
-			}
-			);
-		});
-	}
-};
-
 int main(int argc, char* argv[])
 {
 	try
@@ -290,21 +187,11 @@ int main(int argc, char* argv[])
 
 		std::thread readCOMThread([](){
 			ASIOLib::Executor e;
-			e.OnWorkerThreadError = [](boost::asio::io_service &, boost::system::error_code ec) { ThreadSafeOutput(std::string("SerialReader error (asio): ") + boost::lexical_cast<std::string>(ec)); };
-			e.OnWorkerThreadException = [](boost::asio::io_service &, const std::exception &ex) { ThreadSafeOutput(std::string("SerialReader exception (asio): ") + ex.what()); };
+			e.OnWorkerThreadError = [](boost::asio::io_service &, boost::system::error_code ec) { ThreadSafeOutput(std::string("SerialRW error (asio): ") + boost::lexical_cast<std::string>(ec)); };
+			e.OnWorkerThreadException = [](boost::asio::io_service &, const std::exception &ex) { ThreadSafeOutput(std::string("SerialRW exception (asio): ") + ex.what()); };
 
-			std::vector<WriteBufferElement> writeBuffer;
-			bool noTimeOffsets = false;
-
-			std::string message = "Send Test";
-			if (!message.empty()) {
-				std::vector<unsigned char> v;
-				std::copy(message.begin(), message.end(), std::back_insert_iterator<std::vector<unsigned char>>(v));
-				writeBuffer.push_back(boost::make_tuple(0, v));
-			}
-
-			const boost::shared_ptr<SerialReader> sp(new SerialReader("COM4", 9600, writeBuffer, noTimeOffsets));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
-			e.OnRun = boost::bind(&SerialReader::Create, sp, _1);
+			const boost::shared_ptr<SerialRW> sp(new SerialRW("COM4", 9600));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
+			e.OnRun = boost::bind(&SerialRW::Create, sp, _1);
 			e.Run(1);
 		});
 

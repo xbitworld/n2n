@@ -188,6 +188,138 @@ private:
 };
 
 
+class CCharArray
+{
+	enum { max_length = 4095 };
+
+public:
+	CCharArray(int ilen) :iLength(ilen)
+	{
+		if (iLength > max_length)
+		{
+			std::cout << "Out of range ! 1-Length: " << iLength << std::endl;
+		}
+		pArray = new char[iLength + 1];
+	}
+
+	CCharArray(const char *pStr, int iLen)
+	{
+		iLength = iLen;
+		if (iLength > max_length)
+		{
+			std::cout << "Out of range ! 3-Length: " << iLength << std::endl;
+		}
+
+		pArray = new char[iLength + 1];
+		std::memcpy(pArray, pStr, iLength);
+		pArray[iLength] = '\0';
+	}
+
+	CCharArray(const CCharArray &src)
+	{
+		iLength = src.getLength();
+		if (iLength > max_length)
+		{
+			std::cout << "Out of range ! 2-Length: " << iLength << std::endl;
+		}
+
+		char *charTMP = new char[iLength + 1];
+		std::memcpy(charTMP, src.pArray, iLength);
+
+		pArray = charTMP;
+
+		pArray[iLength] = '\0';
+	}
+
+	CCharArray &operator = (const CCharArray &src)
+	{
+		//		std::cout << "=" << std::endl;
+		if (this == &src)
+		{
+			return *this;
+		}
+
+		iLength = src.getLength();
+		char *charTMP = new char[iLength + 1];
+		std::memcpy(charTMP, src.pArray, iLength);
+
+		if (pArray != nullptr)
+			delete[] pArray;
+		pArray = charTMP;
+
+		pArray[iLength] = '\0';
+
+		return *this;
+	}
+
+	CCharArray(CCharArray &&src)
+	{
+		//		std::cout << "Copy Move" << std::endl;
+		pArray = src.NullArray(iLength);
+	}
+
+	CCharArray &operator =(CCharArray &&src)
+	{
+		//		std::cout << "= Move" << std::endl;
+		if (this == &src)
+		{
+			return *this;
+		}
+
+		if (pArray != nullptr)
+			delete[] pArray;
+
+		pArray = src.NullArray(iLength);
+	}
+
+	virtual ~CCharArray()
+	{//To avoid deconstruct many times
+		if (pArray != nullptr)
+			delete[] pArray;
+
+		pArray = nullptr;
+	}
+
+	char * NullArray(int &iLen)
+	{
+		char * pTMP = nullptr;
+
+		pTMP = pArray;
+		iLen = iLength;
+
+		iLength = 0;
+		pArray = nullptr;
+
+		return pTMP;
+	}
+
+	void put(const char *pStr, int ilen)
+	{
+		iLength = ilen;
+		if (iLength > max_length)
+		{
+			std::cout << "Out of range ! 4-Length: " << iLength << std::endl;
+		}
+
+		std::memcpy(pArray, pStr, iLength);
+		pArray[iLength] = '\0';
+	}
+
+	const int getLength() const
+	{
+		return iLength;
+	}
+
+	const char * getPtr() const
+	{
+		return pArray;
+	}
+
+private:
+	int iLength;
+	char *pArray = nullptr;
+};
+
 template <typename T>
 class ClassMutexList
 {

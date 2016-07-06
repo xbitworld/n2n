@@ -24,6 +24,9 @@
     <ClCompile Include="..\ASIOLib\SerialPort.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\ASIOLib\SerialRW.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="N2U_Server.h">
@@ -36,6 +39,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\ASIOLib\SerialPort.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ASIOLib\SerialRW.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

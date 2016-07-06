@@ -112,11 +112,13 @@
   <ItemGroup>
     <ClCompile Include="..\ASIOLib\Executor.cpp" />
     <ClCompile Include="..\ASIOLib\SerialPort.cpp" />
+    <ClCompile Include="..\ASIOLib\SerialRW.cpp" />
     <ClCompile Include="N2U_Server.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\ASIOLib\Executor.h" />
     <ClInclude Include="..\ASIOLib\SerialPort.h" />
+    <ClInclude Include="..\ASIOLib\SerialRW.h" />
     <ClInclude Include="..\CTMutexSet.h" />
     <ClInclude Include="N2U_Server.h" />
   </ItemGroup>
