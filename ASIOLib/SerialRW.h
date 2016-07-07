@@ -11,7 +11,6 @@ class SerialRW : private boost::noncopyable, public boost::enable_shared_from_th
 	boost::posix_time::ptime _lastRead;
 
 	void OnRead(boost::asio::io_service &ios, const std::vector<unsigned char> &buffer, size_t bytesRead);
-	void Write2Serial(unsigned char *pData, int iLen);
 
 public:
 	SerialRW(const std::string &portName, int baudRate) :
@@ -24,5 +23,10 @@ public:
 		catch (const std::exception &e) {
 			std::cout << e.what() << std::endl;
 		}
+
+		ios.post([=, &ios] {
+				_serialPort->Write("Test Start\r\n");
+		});
 	}
+	void Write2Serial(unsigned char *pData, int iLen);
 };

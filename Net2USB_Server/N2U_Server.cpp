@@ -26,6 +26,15 @@ boost::mutex io_mutex;	//mutex for console display
 ClassMutexList<CMTCharArray> inBuf;		//Client Send to Server
 ClassMutexList<CMTCharArray> outBuf;	//Client Read from Server
 
+ClassMutexList<CCharArray> keyboardInputBuffer;		//Get data from Keyboard
+
+//Insert data to list, and wait for pop
+void PushListData(ClassMutexList<CCharArray> &buf, const char *pData, int iLen)
+{
+	CCharArray tempData(pData, iLen);
+	buf.put(tempData);
+}
+
 static void ThreadSafeOutput(const void * pChar)
 {
 	std::string outputString = std::string((const char *)pChar);
@@ -55,6 +64,9 @@ static void InputCMD(void)
 		{
 			exit(0);
 		}
+
+		msg += "\r\n";
+		PushListData(keyboardInputBuffer, msg.c_str(), msg.size());
 	}
 }
 
@@ -185,20 +197,30 @@ int main(int argc, char* argv[])
 
 		std::thread socketNETThread([&io_service]() { io_service.run(); });
 
-		std::thread readCOMThread([](){
-			ASIOLib::Executor e;
-			e.OnWorkerThreadError = [](boost::asio::io_service &, boost::system::error_code ec) { ThreadSafeOutput(std::string("SerialRW error (asio): ") + boost::lexical_cast<std::string>(ec)); };
-			e.OnWorkerThreadException = [](boost::asio::io_service &, const std::exception &ex) { ThreadSafeOutput(std::string("SerialRW exception (asio): ") + ex.what()); };
+		const boost::shared_ptr<SerialRW> sp(new SerialRW("COM4", 9600));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
 
-			const boost::shared_ptr<SerialRW> sp(new SerialRW("COM4", 9600));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
+		std::thread readCOMThread([&sp](){
+			ASIOLib::Executor e;
+			e.OnWorkerThreadError = [](boost::asio::io_service &, boost::system::error_code ec) { ThreadSafeOutput(std::string("SerialRW Read error (asio): ") + boost::lexical_cast<std::string>(ec)); };
+			e.OnWorkerThreadException = [](boost::asio::io_service &, const std::exception &ex) { ThreadSafeOutput(std::string("SerialRW Read exception (asio): ") + ex.what()); };
+
 			e.OnRun = boost::bind(&SerialRW::Create, sp, _1);
 			e.Run(1);
+		});
+
+		std::thread writeCOMThread([&sp]() {
+			while (true)
+			{
+				CCharArray data = keyboardInputBuffer.get_pop();
+				boost::bind(&SerialRW::Write2Serial, sp, _1, _2)((unsigned char *)(data.getPtr()), data.getLength());
+			}
 		});
 
 		std::thread InputCMDThread(InputCMD);
 
 		socketNETThread.join();
 		readCOMThread.join();
+		writeCOMThread.join();
 		InputCMDThread.join();
 	}
 	catch (std::exception& e)
