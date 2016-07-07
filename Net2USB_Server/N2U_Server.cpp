@@ -26,7 +26,8 @@ boost::mutex io_mutex;	//mutex for console display
 ClassMutexList<CMTCharArray> inBuf;		//Client Send to Server
 ClassMutexList<CMTCharArray> outBuf;	//Client Read from Server
 
-ClassMutexList<CCharArray> keyboardInputBuffer;		//Get data from Keyboard
+ClassMutexList<CCharArray> Net2SerialBuffer;		//Get data from Keyboard
+ClassMutexList<CCharArray> Serial2NetBuffer;		//Get data from Keyboard
 
 //Insert data to list, and wait for pop
 void PushListData(ClassMutexList<CCharArray> &buf, const char *pData, int iLen)
@@ -66,7 +67,7 @@ static void InputCMD(void)
 		}
 
 		msg += "\r\n";
-		PushListData(keyboardInputBuffer, msg.c_str(), msg.size());
+		PushListData(Net2SerialBuffer, msg.c_str(), msg.size());
 	}
 }
 
@@ -93,9 +94,13 @@ private:
 		{
 			if (!ec)
 			{
-				strTMP = "Data: " + std::string(data_);
+				char x[20] = { 0 };
+				::itoa(length, x, 10);
+				strTMP = "Data Length: " + std::string(x);
 				ThreadSafeOutput(strTMP.c_str());
-				do_write(length);
+				//do_write(length);
+				Net2SerialBuffer.put(CCharArray(data_, length));
+				do_read();
 			}
 		});
 	}
@@ -108,7 +113,7 @@ private:
 		{
 			if (!ec)
 			{
-				do_read();
+				return;
 			}
 		});
 	}
@@ -211,7 +216,7 @@ int main(int argc, char* argv[])
 		std::thread writeCOMThread([&sp]() {
 			while (true)
 			{
-				CCharArray data = keyboardInputBuffer.get_pop();
+				CCharArray data = Net2SerialBuffer.get_pop();
 				boost::bind(&SerialRW::Write2Serial, sp, _1, _2)((unsigned char *)(data.getPtr()), data.getLength());
 			}
 		});
