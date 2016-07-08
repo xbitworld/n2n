@@ -155,7 +155,6 @@ public:
 		}
 
 		std::memcpy(pArray, pStr, iLength);
-		pArray[iLength] = '\0';
 	}
 
 	const int getLength() const
@@ -199,7 +198,7 @@ public:
 		{
 			std::cout << "Out of range ! 1-Length: " << iLength << std::endl;
 		}
-		pArray = new char[iLength + 1];
+		pArray = new char[iLength];
 	}
 
 	CCharArray(const char *pStr, int iLen)
@@ -210,9 +209,26 @@ public:
 			std::cout << "Out of range ! 3-Length: " << iLength << std::endl;
 		}
 
-		pArray = new char[iLength + 1];
+		pArray = new char[iLength];
 		std::memcpy(pArray, pStr, iLength);
-		pArray[iLength] = '\0';
+	}
+
+	CCharArray(const std::vector<unsigned char> v)
+	{
+		iLength = v.size();
+		if (iLength > max_length)
+		{
+			std::cout << "Out of range ! 3-Length: " << iLength << std::endl;
+		}
+
+		pArray = new char[iLength];
+
+		int i = 0;
+		for (auto const &c : v)
+		{
+			*(pArray + i)= c;
+			i ++;
+		}
 	}
 
 	CCharArray(const CCharArray &src)
@@ -223,12 +239,10 @@ public:
 			std::cout << "Out of range ! 2-Length: " << iLength << std::endl;
 		}
 
-		char *charTMP = new char[iLength + 1];
+		char *charTMP = new char[iLength];
 		std::memcpy(charTMP, src.pArray, iLength);
 
 		pArray = charTMP;
-
-		pArray[iLength] = '\0';
 	}
 
 	CCharArray &operator = (const CCharArray &src)
@@ -240,14 +254,12 @@ public:
 		}
 
 		iLength = src.getLength();
-		char *charTMP = new char[iLength + 1];
+		char *charTMP = new char[iLength];
 		std::memcpy(charTMP, src.pArray, iLength);
 
 		if (pArray != nullptr)
 			delete[] pArray;
 		pArray = charTMP;
-
-		pArray[iLength] = '\0';
 
 		return *this;
 	}
@@ -302,7 +314,6 @@ public:
 		}
 
 		std::memcpy(pArray, pStr, iLength);
-		pArray[iLength] = '\0';
 	}
 
 	const int getLength() const

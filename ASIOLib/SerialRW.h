@@ -2,7 +2,6 @@
 #include <boost/bind.hpp>
 #include "Executor.h"
 #include "SerialPort.h"
-#include "../CTMutexSet.h"
 
 class SerialRW : private boost::noncopyable, public boost::enable_shared_from_this<SerialRW> {
 	boost::shared_ptr<ASIOLib::SerialPort> _serialPort;
@@ -12,9 +11,12 @@ class SerialRW : private boost::noncopyable, public boost::enable_shared_from_th
 
 	void OnRead(boost::asio::io_service &ios, const std::vector<unsigned char> &buffer, size_t bytesRead);
 
+	void(*_getDataCall)(const std::vector<unsigned char> &buffer);
+
 public:
-	SerialRW(const std::string &portName, int baudRate) :
-		_portName(portName), _baudRate(baudRate) {}
+	SerialRW(void(*getDataCall)(const std::vector<unsigned char> &), const std::string &portName, int baudRate) :
+		_getDataCall(getDataCall), _portName(portName), _baudRate(baudRate) {}
+
 	void Create(boost::asio::io_service &ios) {
 		try {
 			_serialPort.reset(new ASIOLib::SerialPort(ios, _portName));
@@ -28,5 +30,6 @@ public:
 				_serialPort->Write("Test Start\r\n");
 		});
 	}
+
 	void Write2Serial(unsigned char *pData, int iLen);
 };
