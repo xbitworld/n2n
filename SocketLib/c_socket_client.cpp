@@ -5,11 +5,18 @@ namespace dtCSC
 {
 	void CSocketClient::write(const char *pData, int iLen)
 	{
+		std::vector<unsigned char> tmpV;
+
+		for (int i = 0; i < iLen; i++)
+		{
+			tmpV.push_back(*(pData + i));
+		}
+
 		io_service_.post(
-			[this, pData]()
+			[this, tmpV]()
 		{
 			bool write_in_progress = !write_msgs_.empty();
-			//write_msgs_.push_back(pData);
+			write_msgs_.push_back(tmpV);
 			//			if (!write_in_progress)
 			while (write_in_progress)
 			{
@@ -63,11 +70,9 @@ namespace dtCSC
 
 	void CSocketClient::do_read()
 	{
-		std::string splitStr = "</ipv6testmsg>";
-		
 		char *pStr = xReadData;
 		std::memset(pStr, 0, max_length);
-		boost::asio::async_read_until(socket_, streamBUF, splitStr, 
+		boost::asio::async_read(socket_, streamBUF,  
 		[this, pStr](boost::system::error_code ec, std::size_t length)
 		{
 			if (!ec)

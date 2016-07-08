@@ -33,8 +33,7 @@ namespace dtCSC
 			close();
 		}
 
-		void write(const std::string& msg);
-		void CSocketClient::write(const char *pData, int iLen);
+		void write(const char *pData, int iLen);
 		
 		bool isSocketOpen();
 

@@ -72,35 +72,27 @@ static void InputCMD(void)
 	}
 }
 
-static void readCMD(dtCSC::CSocketClient &csc, ClassMutexList<CCharArray> &dataList)
+static void readNetData(dtCSC::CSocketClient &csc, ClassMutexList<CCharArray> &dataList)
 {
 	while (true)
 	{
 		CCharArray tempData = dataList.get_pop();
+		ThreadSafeOutput(tempData.getPtr());
 	}
 	csc.close();
 }
 
-static void writeCMD(dtCSC::CSocketClient &csc, ClassMutexList<CCharArray> &dataList)
+static void writeNetData(dtCSC::CSocketClient &csc, ClassMutexList<CCharArray> &dataList)
 {
 	while (true)
 	{
 		CCharArray tempData = dataList.get_pop();
-		int iLen = tempData.getLength();
-		char * pchars = new char[tempData.getLength()];
-		memcpy_s(pchars, iLen, tempData.getPtr(), iLen);
-
-		std::string strTMP(pchars);
 
 		if (!csc.isSocketOpen())
 		{
 			csc.ReConnect();
 		}
-		csc.write(strTMP);
-
-		delete[] pchars;
-
-		//std::cout << "\tCMD strTMP - Length: " << strTMP.length() << ", Data: \n" << strTMP << std::endl;
+		csc.write(tempData.getPtr(), tempData.getLength());
 	}
 	csc.close();
 }
@@ -157,7 +149,11 @@ int main(int argc, char* argv[])
 
 		boost::asio::ip::tcp::resolver resolver(io_service);
 		auto endpoint_iterator = resolver.resolve({ argv[1], argv[2] });
-		dtCSC::CSocketClient custSocket(io_service, endpoint_iterator, Net2SerialBuffer);
+		dtCSC::CSocketClient custSocket(io_service, endpoint_iterator, std::ref(Net2SerialBuffer));
+
+		std::thread socketRCVThread([&io_service]() { io_service.run(); });
+		std::thread readNetThread(readNetData, std::ref(custSocket), std::ref(Net2SerialBuffer));
+		std::thread writeNetThread(writeNetData, std::ref(custSocket), std::ref(Serial2NetBuffer));
 
 		const boost::shared_ptr<SerialRW> sp(new SerialRW(getSerialData, "COM4", 9600));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
 
@@ -182,6 +178,10 @@ int main(int argc, char* argv[])
 
 		readCOMThread.join();
 		writeCOMThread.join();
+
+		socketRCVThread.join();
+		readNetThread.join();
+		writeNetThread.join();
 
 		InputCMDThread.join();
 	}
