@@ -14,22 +14,23 @@
 #include <iostream>
 #include <thread>
 
+#include "N2U_Client.h"
 #include "../CTMutexSet.h"
-#include "N2U_Server.h"
 #include "../ASIOLib/SerialRW.h"
+#include "../SocketLib/c_socket_client.h"
 
 std::string strTMP;
 
 using boost::asio::ip::tcp;
 
 boost::mutex io_mutex;	//mutex for console display
-ClassMutexList<CMTCharArray> inBuf;		//Client Send to Server
-ClassMutexList<CMTCharArray> outBuf;	//Client Read from Server
+ClassMutexList<CCharArray> inBuf;		//Client Send to Server
+ClassMutexList<CCharArray> outBuf;	//Client Read from Server
 
 ClassMutexList<CCharArray> Net2SerialBuffer;		//Buffer for send to serial
 ClassMutexList<CCharArray> Serial2NetBuffer;		//Buffer for send to socket
 
-//Insert data to list, and wait for pop
+													//Insert data to list, and wait for pop
 void PushListData(ClassMutexList<CCharArray> &buf, const char *pData, int iLen)
 {
 	CCharArray tempData(pData, iLen);
@@ -71,102 +72,38 @@ static void InputCMD(void)
 	}
 }
 
-class SocketSession
-	: public std::enable_shared_from_this<SocketSession>
+static void readCMD(dtCSC::CSocketClient &csc, ClassMutexList<CCharArray> &dataList)
 {
-public:
-	SocketSession(tcp::socket socket)
-		: socket_(std::move(socket))
+	while (true)
 	{
+		CCharArray tempData = dataList.get_pop();
 	}
+	csc.close();
+}
 
-	void start()
+static void writeCMD(dtCSC::CSocketClient &csc, ClassMutexList<CCharArray> &dataList)
+{
+	while (true)
 	{
-		do_write("Net Start\r\n", 11);
-		do_read();
-	}
+		CCharArray tempData = dataList.get_pop();
+		int iLen = tempData.getLength();
+		char * pchars = new char[tempData.getLength()];
+		memcpy_s(pchars, iLen, tempData.getPtr(), iLen);
 
-	void do_write(const char *pData, std::size_t length)
-	{
-		if (socket_.available() == 0)
+		std::string strTMP(pchars);
+
+		if (!csc.isSocketOpen())
 		{
-			ThreadSafeOutput("Socket did not connected!\r\n");
-			return;
+			csc.ReConnect();
 		}
+		csc.write(strTMP);
 
-		auto self(shared_from_this());
-		boost::asio::async_write(socket_, boost::asio::buffer(pData, length),
-			[this, self](boost::system::error_code ec, std::size_t /*length*/)
-		{
-			if (!ec)
-			{
-				return;
-			}
-		});
+		delete[] pchars;
+
+		//std::cout << "\tCMD strTMP - Length: " << strTMP.length() << ", Data: \n" << strTMP << std::endl;
 	}
-
-private:
-	void do_read()
-	{
-		auto self(shared_from_this());
-		socket_.async_read_some(boost::asio::buffer(data_, max_length),
-			[this, self](boost::system::error_code ec, std::size_t length)
-		{
-			if (!ec)
-			{
-				char x[20] = { 0 };
-				::_itoa_s(length, x, 10);
-				strTMP = "Data Length: " + std::string(x);
-				ThreadSafeOutput(strTMP.c_str());
-
-				Net2SerialBuffer.put(CCharArray(data_, length));
-				do_read();
-			}
-		});
-	}
-
-	tcp::socket socket_;
-	enum { max_length = 4096 };
-	char data_[max_length];
-};
-
-class NetServer
-{
-public:
-	NetServer(boost::asio::io_service& io_service, tcp::endpoint endpoint)
-		: acceptor_(io_service, endpoint),
-		socket_(io_service)
-	{
-		do_accept();
-	}
-
-	void write(const char *pData, std::size_t length)
-	{
-		_pSocketSession->do_write(pData, length);
-	}
-
-private:
-	void do_accept()
-	{
-		acceptor_.async_accept(socket_,
-			[this](boost::system::error_code ec)
-		{
-			if (!ec)
-			{
-				ThreadSafeOutput("Accept");
-				_pSocketSession = std::make_shared<SocketSession>(std::move(socket_));
-				_pSocketSession->start();
-				//std::make_shared<SocketSession>(std::move(socket_))->start();
-			}
-
-			do_accept();
-		});
-	}
-
-	tcp::acceptor acceptor_;
-	tcp::socket socket_;
-	std::shared_ptr<SocketSession> _pSocketSession;
-};
+	csc.close();
+}
 
 //Insert data to list, and wait for pop
 void PushData(ClassMutexList<CCharArray> &buf, const char *pData, int iLen)
@@ -217,23 +154,14 @@ int main(int argc, char* argv[])
 		boost::asio::io_service io_service;
 		strTMP = std::string("Address: " + std::string(argv[1]) + ", Port: " + argv[2]);
 		ThreadSafeOutput(strTMP.c_str());
-		boost::asio::ip::address address = boost::asio::ip::address::from_string(argv[1]);
-		tcp::endpoint endpoint(address, atoi(argv[2]));
 
-		NetServer SocketServer(io_service, endpoint);
-
-		std::thread socketReadThread([&io_service]() { io_service.run(); });
-		std::thread socketWriteThread([&SocketServer]() {
-			while (true)
-			{
-				CCharArray data = Serial2NetBuffer.get_pop();
-				SocketServer.write(data.getPtr(), data.getLength());
-			}
-		});
+		boost::asio::ip::tcp::resolver resolver(io_service);
+		auto endpoint_iterator = resolver.resolve({ argv[1], argv[2] });
+		dtCSC::CSocketClient custSocket(io_service, endpoint_iterator, Net2SerialBuffer);
 
 		const boost::shared_ptr<SerialRW> sp(new SerialRW(getSerialData, "COM4", 9600));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
 
-		std::thread readCOMThread([&sp](){
+		std::thread readCOMThread([&sp]() {
 			ASIOLib::Executor e;
 			e.OnWorkerThreadError = [](boost::asio::io_service &, boost::system::error_code ec) { ThreadSafeOutput(std::string("SerialRW Read error (asio): ") + boost::lexical_cast<std::string>(ec)); };
 			e.OnWorkerThreadException = [](boost::asio::io_service &, const std::exception &ex) { ThreadSafeOutput(std::string("SerialRW Read exception (asio): ") + ex.what()); };
@@ -252,8 +180,6 @@ int main(int argc, char* argv[])
 
 		std::thread InputCMDThread(InputCMD);
 
-		socketReadThread.join();
-		socketWriteThread.join();
 		readCOMThread.join();
 		writeCOMThread.join();
 
