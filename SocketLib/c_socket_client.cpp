@@ -21,7 +21,7 @@ namespace dtCSC
 			while (write_in_progress)
 			{
 				write_in_progress = !write_msgs_.empty();
-				std::cout << "Write ...... : " << std::endl;
+				ThreadSafeOutput("Write ...... : ");
 			}
 			{
 				do_write();
@@ -36,12 +36,18 @@ namespace dtCSC
 
 	void CSocketClient::do_connect(boost::asio::ip::tcp::resolver::iterator endpoint_iterator)
 	{
+		ThreadSafeOutput("Connect\r\n");
 		boost::asio::async_connect(socket_, endpoint_iterator,
 		[this](boost::system::error_code ec, boost::asio::ip::tcp::resolver::iterator)
 		{
 			if (!ec)
 			{
 				do_read();
+			}
+			else
+			{
+				::Sleep(1000);
+				ReConnect();
 			}
 		});
 	}
@@ -53,7 +59,7 @@ namespace dtCSC
 
 	void CSocketClient::ReConnect()
 	{
-		std::cout << "Reconnect" << std::endl;
+		ThreadSafeOutput("Reconnect");
 		
 		if(socket_.is_open())
 			close();
@@ -65,6 +71,11 @@ namespace dtCSC
 			{
 				do_read();
 			}
+			else
+			{
+				::Sleep(1000);
+				ReConnect();
+			}
 		});
 	}
 
@@ -72,20 +83,20 @@ namespace dtCSC
 	{
 		char *pStr = xReadData;
 		std::memset(pStr, 0, max_length);
-		boost::asio::async_read(socket_, streamBUF,  
-		[this, pStr](boost::system::error_code ec, std::size_t length)
+		socket_.async_read_some(boost::asio::buffer(pStr, max_length),
+			[this, pStr](boost::system::error_code ec, std::size_t length)
 		{
 			if (!ec)
 			{
-				std::istream is(&streamBUF);
-				int iLen = streamBUF.size();
-				is.read(pStr, iLen);
-
-				std::cout << length << ", Data 1: " << pStr << std::endl;
+				ThreadSafeOutput("Net Read");
 				CCharArray dataTemp((const char *)pStr, length);
 				pReadData->put(dataTemp);
-				//std::cout << dataTemp.getLength() << ", Data 2: " << pStr << std::endl;
 				do_read();
+			}
+			else
+			{
+				::Sleep(1000);
+				ReConnect();
 			}
 		});
 	}
@@ -108,7 +119,8 @@ namespace dtCSC
 			}
 			else
 			{
-				socket_.close();
+				::Sleep(1000);
+				ReConnect();
 			}
 		});
 	}

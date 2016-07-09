@@ -13,17 +13,20 @@ namespace dtCSC
 	typedef std::deque<std::vector<unsigned char>> MessageQueue;
 
 	class CSocketClient
+		: public std::enable_shared_from_this<CSocketClient>
 	{
 	public:
 		CSocketClient(boost::asio::io_service& io_service,
 		boost::asio::ip::tcp::resolver::iterator endpoint_iterator,
-		ClassMutexList<CCharArray> &pBuff)
+		ClassMutexList<CCharArray> &pBuff, void(*pFun)(const void * pChar))
 		: io_service_(io_service)
 		, socket_(io_service)
+		, end_iterator(endpoint_iterator)
+		, ThreadSafeOutput(pFun)
 		{
 			pReadData = &pBuff;
-			end_iterator = endpoint_iterator;
-			do_connect(endpoint_iterator);
+			end_iterator = end_iterator;
+			do_connect(end_iterator);
 		}
 
 		void close();
@@ -54,6 +57,9 @@ namespace dtCSC
 		ClassMutexList<CCharArray> *pReadData;
 		boost::asio::ip::tcp::resolver::iterator end_iterator;
 		boost::asio::streambuf streamBUF;
+
+		void(*ThreadSafeOutput)(const void * pChar);
+
 	};
 
 }//namespace dtCSC

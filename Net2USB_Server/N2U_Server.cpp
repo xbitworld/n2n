@@ -23,8 +23,6 @@ std::string strTMP;
 using boost::asio::ip::tcp;
 
 boost::mutex io_mutex;	//mutex for console display
-ClassMutexList<CMTCharArray> inBuf;		//Client Send to Server
-ClassMutexList<CMTCharArray> outBuf;	//Client Read from Server
 
 ClassMutexList<CCharArray> Net2SerialBuffer;		//Buffer for send to serial
 ClassMutexList<CCharArray> Serial2NetBuffer;		//Buffer for send to socket
@@ -215,10 +213,10 @@ int main(int argc, char* argv[])
 		}
 
 		boost::asio::io_service io_service;
-		strTMP = std::string("Address: " + std::string(argv[1]) + ", Port: " + argv[2]);
+		strTMP = std::string("Serial: " + std::string(argv[1]) + ", Address: " + std::string(argv[2]) + ", Port: " + argv[3]);
 		ThreadSafeOutput(strTMP.c_str());
-		boost::asio::ip::address address = boost::asio::ip::address::from_string(argv[1]);
-		tcp::endpoint endpoint(address, atoi(argv[2]));
+		boost::asio::ip::address address = boost::asio::ip::address::from_string(argv[2]);
+		tcp::endpoint endpoint(address, atoi(argv[3]));
 
 		NetServer SocketServer(io_service, endpoint);
 
@@ -231,7 +229,7 @@ int main(int argc, char* argv[])
 			}
 		});
 
-		const boost::shared_ptr<SerialRW> sp(new SerialRW(getSerialData, "COM4", 9600));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
+		const boost::shared_ptr<SerialRW> sp(new SerialRW(getSerialData, argv[1], 9600));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
 
 		std::thread readCOMThread([&sp](){
 			ASIOLib::Executor e;

@@ -68,7 +68,7 @@ static void InputCMD(void)
 		}
 
 		msg += "\r\n";
-		PushListData(Net2SerialBuffer, msg.c_str(), msg.size());
+		PushListData(Serial2NetBuffer, msg.c_str(), msg.size());
 	}
 }
 
@@ -139,23 +139,24 @@ int main(int argc, char* argv[])
 	{
 		if (argc < 3)
 		{
-			std::cerr << "Usage: DelivData <host> <port>\n";
+			std::cerr << "Usage: DelivData <serial> <host> <port>\n";
 			return 1;
 		}
 
 		boost::asio::io_service io_service;
-		strTMP = std::string("Address: " + std::string(argv[1]) + ", Port: " + argv[2]);
+		strTMP = std::string("Serial: " + std::string(argv[1]) + ", Address: " + std::string(argv[2]) + ", Port: " + argv[3]);
 		ThreadSafeOutput(strTMP.c_str());
 
 		boost::asio::ip::tcp::resolver resolver(io_service);
-		auto endpoint_iterator = resolver.resolve({ argv[1], argv[2] });
-		dtCSC::CSocketClient custSocket(io_service, endpoint_iterator, std::ref(Net2SerialBuffer));
+		auto endpoint_iterator = resolver.resolve({ argv[2], argv[3] });
+		dtCSC::CSocketClient custSocket(io_service, endpoint_iterator, std::ref(Net2SerialBuffer), ThreadSafeOutput);
+		//custSocket.setOutputFun(ThreadSafeOutput);
 
 		std::thread socketRCVThread([&io_service]() { io_service.run(); });
 		std::thread readNetThread(readNetData, std::ref(custSocket), std::ref(Net2SerialBuffer));
 		std::thread writeNetThread(writeNetData, std::ref(custSocket), std::ref(Serial2NetBuffer));
 
-		const boost::shared_ptr<SerialRW> sp(new SerialRW(getSerialData, "COM4", 9600));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
+		const boost::shared_ptr<SerialRW> sp(new SerialRW(getSerialData, argv[1], 9600));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
 
 		std::thread readCOMThread([&sp]() {
 			ASIOLib::Executor e;
