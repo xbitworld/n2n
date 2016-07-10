@@ -97,40 +97,23 @@ static void writeNetData(dtCSC::CSocketClient &csc, ClassMutexList<CCharArray> &
 	csc.close();
 }
 
-//Insert data to list, and wait for pop
-void PushData(ClassMutexList<CCharArray> &buf, const char *pData, int iLen)
-{
-	CCharArray tempData(pData, iLen);
-	buf.put(tempData);
-}
-
-//Get data from Serial List and wait for be sent to Network Port
-void PopSerialData(ClassMutexList<CCharArray> &dataList)
-{
-	while (1)
-	{
-		CCharArray tempData = dataList.get_pop();
-		int iLen = tempData.getLength();
-		const char * pDataStr = tempData.getPtr();
-	}
-}
-
-//Get data from Net List and wait for be sent to Serial Port
-void PopNetData(ClassMutexList<CCharArray> &dataList)
-{
-	while (1)
-	{
-		CCharArray tempData = dataList.get_pop();
-		int iLen = tempData.getLength();
-		const char * pDataStr = tempData.getPtr();
-	}
-}
-
 //Get data from Serial Port, then the function be calledback
+static bool bConn = false;
 void getSerialData(const std::vector<unsigned char> &SerialData)
 {
-	Serial2NetBuffer.put(CCharArray(SerialData));
-	ThreadSafeOutput(std::string(" Serial Data \r\n"));
+	std::string notifyConn = "Connect&&The@@Net^^Work";
+
+	CCharArray tmp = CCharArray(SerialData);
+
+	if (bConn)
+	{
+		Serial2NetBuffer.put(tmp);
+	}
+	else
+	{
+		bConn = !notifyConn.compare(tmp.getPtr());
+	}
+	//ThreadSafeOutput(std::string(" Serial Data \r\n"));
 }
 
 int main(int argc, char* argv[])
@@ -146,15 +129,6 @@ int main(int argc, char* argv[])
 		boost::asio::io_service io_service;
 		strTMP = std::string("Serial: " + std::string(argv[1]) + ", Address: " + std::string(argv[2]) + ", Port: " + argv[3]);
 		ThreadSafeOutput(strTMP.c_str());
-
-		boost::asio::ip::tcp::resolver resolver(io_service);
-		auto endpoint_iterator = resolver.resolve({ argv[2], argv[3] });
-		dtCSC::CSocketClient custSocket(io_service, endpoint_iterator, std::ref(Net2SerialBuffer), ThreadSafeOutput);
-		//custSocket.setOutputFun(ThreadSafeOutput);
-
-		std::thread socketRCVThread([&io_service]() { io_service.run(); });
-		std::thread readNetThread(readNetData, std::ref(custSocket), std::ref(Net2SerialBuffer));
-		std::thread writeNetThread(writeNetData, std::ref(custSocket), std::ref(Serial2NetBuffer));
 
 		const boost::shared_ptr<SerialRW> sp(new SerialRW(getSerialData, argv[1], 9600));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
 
@@ -179,6 +153,17 @@ int main(int argc, char* argv[])
 
 		readCOMThread.join();
 		writeCOMThread.join();
+
+		while (!bConn) { ::Sleep(100); }
+
+		boost::asio::ip::tcp::resolver resolver(io_service);
+		auto endpoint_iterator = resolver.resolve({ argv[2], argv[3] });
+		dtCSC::CSocketClient custSocket(io_service, endpoint_iterator, std::ref(Net2SerialBuffer), ThreadSafeOutput);
+		//custSocket.setOutputFun(ThreadSafeOutput);
+
+		std::thread socketRCVThread([&io_service]() { io_service.run(); });
+		std::thread readNetThread(readNetData, std::ref(custSocket), std::ref(Net2SerialBuffer));
+		std::thread writeNetThread(writeNetData, std::ref(custSocket), std::ref(Serial2NetBuffer));
 
 		socketRCVThread.join();
 		readNetThread.join();

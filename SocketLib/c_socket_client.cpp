@@ -88,7 +88,6 @@ namespace dtCSC
 		{
 			if (!ec)
 			{
-				ThreadSafeOutput("Net Read");
 				CCharArray dataTemp((const char *)pStr, length);
 				pReadData->put(dataTemp);
 				do_read();
@@ -110,7 +109,6 @@ namespace dtCSC
 		{
 			if (!ec)
 			{
-				//std::cout << "Now Send Data :" << write_msgs_.front() << std::endl;
 				write_msgs_.pop_front();
 				if (!write_msgs_.empty())
 				{

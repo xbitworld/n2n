@@ -148,7 +148,9 @@ private:
 				ThreadSafeOutput("Accept");
 				_pSocketSession = std::make_shared<SocketSession>(std::move(socket_));
 				_pSocketSession->start();
-				//std::make_shared<SocketSession>(std::move(socket_))->start();
+
+				std::string notifyConn = "Connect&&The@@Net^^Work";
+				Serial2NetBuffer.put(CCharArray(notifyConn.c_str(), notifyConn.length()));
 			}
 
 			do_accept();
@@ -159,35 +161,6 @@ private:
 	tcp::socket socket_;
 	std::shared_ptr<SocketSession> _pSocketSession;
 };
-
-//Insert data to list, and wait for pop
-void PushData(ClassMutexList<CCharArray> &buf, const char *pData, int iLen)
-{
-	CCharArray tempData(pData, iLen);
-	buf.put(tempData);
-}
-
-//Get data from Serial List and wait for be sent to Network Port
-void PopSerialData(ClassMutexList<CCharArray> &dataList)
-{
-	while (1)
-	{
-		CCharArray tempData = dataList.get_pop();
-		int iLen = tempData.getLength();
-		const char * pDataStr = tempData.getPtr();
-	}
-}
-
-//Get data from Net List and wait for be sent to Serial Port
-void PopNetData(ClassMutexList<CCharArray> &dataList)
-{
-	while (1)
-	{
-		CCharArray tempData = dataList.get_pop();
-		int iLen = tempData.getLength();
-		const char * pDataStr = tempData.getPtr();
-	}
-}
 
 //Get data from Serial Port, then the function be calledback
 void getSerialData(const std::vector<unsigned char> &SerialData)
