@@ -25,10 +25,6 @@ public:
 		catch (const std::exception &e) {
 			std::cout << e.what() << std::endl;
 		}
-
-		ios.post([=, &ios] {
-				_serialPort->Write("Test Start\r\n");
-		});
 	}
 
 	void Write2Serial(unsigned char *pData, int iLen);
