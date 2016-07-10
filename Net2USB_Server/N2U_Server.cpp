@@ -80,18 +80,12 @@ public:
 
 	void start()
 	{
-		do_write("Net Start\r\n", 11);
+		//do_write("Net Start\r\n", 11);
 		do_read();
 	}
 
 	void do_write(const char *pData, std::size_t length)
 	{
-		if (socket_.available() == 0)
-		{
-			ThreadSafeOutput("Socket did not connected!\r\n");
-			return;
-		}
-
 		auto self(shared_from_this());
 		boost::asio::async_write(socket_, boost::asio::buffer(pData, length),
 			[this, self](boost::system::error_code ec, std::size_t /*length*/)
@@ -250,10 +244,10 @@ int main(int argc, char* argv[])
 
 		std::thread InputCMDThread(InputCMD);
 
-		socketReadThread.join();
-		socketWriteThread.join();
 		readCOMThread.join();
 		writeCOMThread.join();
+		socketReadThread.join();
+		socketWriteThread.join();
 
 		InputCMDThread.join();
 	}
