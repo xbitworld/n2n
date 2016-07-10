@@ -98,12 +98,11 @@ static void writeNetData(dtCSC::CSocketClient &csc, ClassMutexList<CCharArray> &
 }
 
 //Get data from Serial Port, then the function be calledback
-static bool bConn = false;
-void getSerialData(const std::vector<unsigned char> &SerialData)
+static std::atomic_bool bConn = false;
+std::string notifyConn = "Connect&&The@@Net^^Work";
+void getSerialData(const std::vector<unsigned char> &SerialData, int iLen)
 {
-	std::string notifyConn = "Connect&&The@@Net^^Work";
-
-	CCharArray tmp = CCharArray(SerialData);
+	CCharArray tmp = CCharArray(SerialData, iLen);
 
 	if (bConn)
 	{
@@ -111,7 +110,7 @@ void getSerialData(const std::vector<unsigned char> &SerialData)
 	}
 	else
 	{
-		bConn = !notifyConn.compare(tmp.getPtr());
+		bConn = strncmp(notifyConn.c_str(), tmp.getPtr(), iLen);
 	}
 	//ThreadSafeOutput(std::string(" Serial Data \r\n"));
 }

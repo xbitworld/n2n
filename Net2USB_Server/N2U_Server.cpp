@@ -150,7 +150,7 @@ private:
 				_pSocketSession->start();
 
 				std::string notifyConn = "Connect&&The@@Net^^Work";
-				Serial2NetBuffer.put(CCharArray(notifyConn.c_str(), notifyConn.length()));
+				Net2SerialBuffer.put(CCharArray(notifyConn.c_str(), notifyConn.length()));
 			}
 
 			do_accept();
@@ -163,10 +163,10 @@ private:
 };
 
 //Get data from Serial Port, then the function be calledback
-void getSerialData(const std::vector<unsigned char> &SerialData)
+void getSerialData(const std::vector<unsigned char> &SerialData, int iLen)
 {
-	Serial2NetBuffer.put(CCharArray(SerialData));
-	ThreadSafeOutput(std::string(" Serial Data \r\n"));
+	Serial2NetBuffer.put(CCharArray(SerialData, iLen));
+//	ThreadSafeOutput(std::string(" Serial Data \r\n"));
 }
 
 int main(int argc, char* argv[])

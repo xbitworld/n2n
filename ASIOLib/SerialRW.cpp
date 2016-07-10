@@ -13,9 +13,9 @@ void SerialRW::OnRead(boost::asio::io_service &, const std::vector<unsigned char
 
 	_lastRead = now;
 
-	std::copy(v.begin(), v.end(), std::ostream_iterator<unsigned char>(std::cout, ""));
+	//std::copy(v.begin(), v.end(), std::ostream_iterator<unsigned char>(std::cout, ""));
 
-	_getDataCall(v);
+	_getDataCall(v, bytesRead);
 }
 
 void SerialRW::Write2Serial(unsigned char *pData, int iLen)

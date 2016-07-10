@@ -32,20 +32,19 @@ public:
 		std::memcpy(pArray, pStr, iLength);
 	}
 
-	CCharArray(const std::vector<unsigned char> v)
+	CCharArray(const std::vector<unsigned char> v, int iLen)
 	{
-		iLength = v.size();
-		if (iLength > max_length)
+		iLen = v.size();
+		if (iLen > max_length)
 		{
 			std::cout << "Out of range ! 3-Length: " << iLength << std::endl;
 		}
 
-		pArray = new char[iLength];
+		pArray = new char[iLen];
 
-		int i = 0;
-		for (auto const &c : v)
+		for (int i = 0; i < iLen; i++)
 		{
-			*(pArray + i)= c;
+			*(pArray + i) = v[i];
 			i ++;
 		}
 	}
