@@ -163,10 +163,10 @@ private:
 };
 
 //Get data from Serial Port, then the function be calledback
-int getSerialData(const std::vector<unsigned char> &SerialData, int iLen)
+static int getSerialData(const std::vector<unsigned char> &SerialData, int iLen)
 {
 	Serial2NetBuffer.put(CCharArray(SerialData, iLen));
-//	ThreadSafeOutput(std::string(" Serial Data \r\n"));
+	ThreadSafeOutput(std::string("Serial Data \r\n"));
 
 	return 0;
 }
@@ -205,7 +205,7 @@ int main(int argc, char* argv[])
 			e.OnWorkerThreadError = [](boost::asio::io_service &, boost::system::error_code ec) { ThreadSafeOutput(std::string("SerialRW Read error (asio): ") + boost::lexical_cast<std::string>(ec)); };
 			e.OnWorkerThreadException = [](boost::asio::io_service &, const std::exception &ex) { ThreadSafeOutput(std::string("SerialRW Read exception (asio): ") + ex.what()); };
 
-			e.OnRun = boost::bind(&SerialRW::Create, sp, _1);
+			e.OnRun = boost::bind(&SerialRW::Create, sp);
 			e.Run(1);
 		});
 

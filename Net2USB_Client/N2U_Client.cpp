@@ -113,10 +113,7 @@ static int getSerialData(const std::vector<unsigned char> &SerialData, int iLen)
 		bConn = (strncmp(notifyConn.c_str(), tmp.getPtr(), iLen) == 0);
 	}
 
-	if (bConn)
-	{
-		ThreadSafeOutput(std::string(" Serial Data \r\n"));
-	}
+	ThreadSafeOutput(std::string("Serial Data\r\n"));// +std::string(tmp.getPtr()));
 
 	return 0;
 }
@@ -146,6 +143,22 @@ int main(int argc, char* argv[])
 			e.Run(1);
 		});
 
+		//std::thread writeCOMThread([&sp]() {
+		//	ASIOLib::Executor e;
+		//	e.OnWorkerThreadError = [](boost::asio::io_service &, boost::system::error_code ec) { ThreadSafeOutput(std::string("SerialRW Read error (asio): ") + boost::lexical_cast<std::string>(ec)); };
+		//	e.OnWorkerThreadException = [](boost::asio::io_service &, const std::exception &ex) { ThreadSafeOutput(std::string("SerialRW Read exception (asio): ") + ex.what()); };
+
+		//	e.OnRun = [&](boost::asio::io_service &)->void
+		//	{
+		//		while (true)
+		//		{
+		//			CCharArray data = Net2SerialBuffer.get_pop();
+		//			sp->Write2Serial((unsigned char *)(data.getPtr()), data.getLength());
+		//		}
+		//	};
+		//	e.Run(1);
+		//});
+
 		std::thread writeCOMThread([&sp]() {
 			while (true)
 			{
@@ -154,28 +167,25 @@ int main(int argc, char* argv[])
 			}
 		});
 
-		while (!bConn) 
-		{ 
-			::Sleep(100); 
-		}
+		//while (!bConn) 
+		//{ 
+		//	::Sleep(100); 
+		//}
 		
 		boost::asio::ip::tcp::resolver resolver(io_service);
 		auto endpoint_iterator = resolver.resolve({ argv[2], argv[3] });
 		dtCSC::CSocketClient custSocket(io_service, endpoint_iterator, std::ref(Net2SerialBuffer), ThreadSafeOutput);
-		//custSocket.setOutputFun(ThreadSafeOutput);
 
 		std::thread socketRCVThread([&io_service]() { io_service.run(); });
-		//std::thread readNetThread(readNetData, std::ref(custSocket), std::ref(Net2SerialBuffer));
 		std::thread writeNetThread(writeNetData, std::ref(custSocket), std::ref(Serial2NetBuffer));
 
+		std::thread InputCMDThread(InputCMD);
 
 		readCOMThread.join();
 		writeCOMThread.join();
 		socketRCVThread.join();
-		//readNetThread.join();
 		writeNetThread.join();
 
-		std::thread InputCMDThread(InputCMD);
 		InputCMDThread.join();
 	}
 	catch (std::exception& e)

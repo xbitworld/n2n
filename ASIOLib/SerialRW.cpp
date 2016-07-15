@@ -49,6 +49,11 @@ void SerialRW::OnRead(boost::asio::io_service &, const std::vector<unsigned char
 
 split:
 	int inewSize = vTemp.size();
+	if (inewSize > 4096)
+	{
+		vTemp.clear();
+		return;
+	}
 
 	for (int iLoop = ((ioldSize > iCmpSize) ? ioldSize - iCmpSize : 0); iLoop < inewSize; iLoop ++)
 	{
@@ -85,10 +90,6 @@ split:
 			goto split;
 		}
 	}
-
-	vTemp.clear();
-	
-	//_getDataCall(buffer, bytesRead);
 }
 
 void SerialRW::Write2Serial(unsigned char *pData, int iLen)
