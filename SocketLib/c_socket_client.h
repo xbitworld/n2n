@@ -56,7 +56,6 @@ namespace dtCSC
 		MessageQueue write_msgs_;
 		ClassMutexList<CCharArray> *pReadData;
 		boost::asio::ip::tcp::resolver::iterator end_iterator;
-		boost::asio::streambuf streamBUF;
 
 		void(*ThreadSafeOutput)(const void * pChar);
 

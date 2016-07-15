@@ -45,7 +45,6 @@ public:
 		for (int i = 0; i < iLen; i++)
 		{
 			*(pArray + i) = v[i];
-			i ++;
 		}
 	}
 

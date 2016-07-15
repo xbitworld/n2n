@@ -68,19 +68,19 @@ static void InputCMD(void)
 		}
 
 		msg += "\r\n";
-		PushListData(Serial2NetBuffer, msg.c_str(), msg.size());
+		PushListData(Net2SerialBuffer, msg.c_str(), msg.size());
 	}
 }
-
-static void readNetData(dtCSC::CSocketClient &csc, ClassMutexList<CCharArray> &dataList)
-{
-	while (true)
-	{
-		CCharArray tempData = dataList.get_pop();
-		ThreadSafeOutput(tempData.getPtr());
-	}
-	csc.close();
-}
+//
+//static void readNetData(dtCSC::CSocketClient &csc, ClassMutexList<CCharArray> &dataList)
+//{
+//	while (true)
+//	{
+//		CCharArray tempData = dataList.get_pop();
+//		ThreadSafeOutput(tempData.getPtr());
+//	}
+//	csc.close();
+//}
 
 static void writeNetData(dtCSC::CSocketClient &csc, ClassMutexList<CCharArray> &dataList)
 {
@@ -100,7 +100,7 @@ static void writeNetData(dtCSC::CSocketClient &csc, ClassMutexList<CCharArray> &
 //Get data from Serial Port, then the function be calledback
 static std::atomic_bool bConn = false;
 std::string notifyConn = "Connect&&The@@Net^^Work";
-void getSerialData(const std::vector<unsigned char> &SerialData, int iLen)
+static int getSerialData(const std::vector<unsigned char> &SerialData, int iLen)
 {
 	CCharArray tmp = CCharArray(SerialData, iLen);
 
@@ -110,9 +110,15 @@ void getSerialData(const std::vector<unsigned char> &SerialData, int iLen)
 	}
 	else
 	{
-		bConn = strncmp(notifyConn.c_str(), tmp.getPtr(), iLen);
+		bConn = (strncmp(notifyConn.c_str(), tmp.getPtr(), iLen) == 0);
 	}
-	//ThreadSafeOutput(std::string(" Serial Data \r\n"));
+
+	if (bConn)
+	{
+		ThreadSafeOutput(std::string(" Serial Data \r\n"));
+	}
+
+	return 0;
 }
 
 int main(int argc, char* argv[])
@@ -148,26 +154,28 @@ int main(int argc, char* argv[])
 			}
 		});
 
-		std::thread InputCMDThread(InputCMD);
-
-		readCOMThread.join();
-		writeCOMThread.join();
-
-		while (!bConn) { ::Sleep(100); }
-
+		while (!bConn) 
+		{ 
+			::Sleep(100); 
+		}
+		
 		boost::asio::ip::tcp::resolver resolver(io_service);
 		auto endpoint_iterator = resolver.resolve({ argv[2], argv[3] });
 		dtCSC::CSocketClient custSocket(io_service, endpoint_iterator, std::ref(Net2SerialBuffer), ThreadSafeOutput);
 		//custSocket.setOutputFun(ThreadSafeOutput);
 
 		std::thread socketRCVThread([&io_service]() { io_service.run(); });
-		std::thread readNetThread(readNetData, std::ref(custSocket), std::ref(Net2SerialBuffer));
+		//std::thread readNetThread(readNetData, std::ref(custSocket), std::ref(Net2SerialBuffer));
 		std::thread writeNetThread(writeNetData, std::ref(custSocket), std::ref(Serial2NetBuffer));
 
+
+		readCOMThread.join();
+		writeCOMThread.join();
 		socketRCVThread.join();
-		readNetThread.join();
+		//readNetThread.join();
 		writeNetThread.join();
 
+		std::thread InputCMDThread(InputCMD);
 		InputCMDThread.join();
 	}
 	catch (std::exception& e)

@@ -32,12 +32,13 @@ void ASIOLib::SerialPort::ReadBegin() {
 }
 
 void ASIOLib::SerialPort::ReadComplete(const boost::system::error_code &ec, size_t bytesTransferred) {
-	if (!ec) {
+	if (!ec) 
+	{
 		if (_onRead && (bytesTransferred > 0))
+		{
 			_onRead(boost::ref(_serialPort.get_io_service()), boost::cref(_readBuffer), bytesTransferred); // callback executes before any additional reads are queued, so access to the buffer is guaranteed as the buffer won't be overwritten
-		
-		if(_readBuffer.size() > 0)
-		//std::cout << _readBuffer[0] << std::endl;
+		}
+
 		ReadBegin();  // queue another read
 	} else {
 		Close();

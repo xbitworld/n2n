@@ -163,10 +163,12 @@ private:
 };
 
 //Get data from Serial Port, then the function be calledback
-void getSerialData(const std::vector<unsigned char> &SerialData, int iLen)
+int getSerialData(const std::vector<unsigned char> &SerialData, int iLen)
 {
 	Serial2NetBuffer.put(CCharArray(SerialData, iLen));
 //	ThreadSafeOutput(std::string(" Serial Data \r\n"));
+
+	return 0;
 }
 
 int main(int argc, char* argv[])
@@ -214,7 +216,7 @@ int main(int argc, char* argv[])
 				sp->Write2Serial((unsigned char *)(data.getPtr()), data.getLength());
 			}
 		});
-
+		
 		std::thread InputCMDThread(InputCMD);
 
 		readCOMThread.join();
