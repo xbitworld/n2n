@@ -121,6 +121,7 @@
     <ClInclude Include="..\ASIOLib\SerialPort.h" />
     <ClInclude Include="..\ASIOLib\SerialRW.h" />
     <ClInclude Include="..\CTMutexSet.h" />
+    <ClInclude Include="..\HEXSTRTable.h" />
     <ClInclude Include="N2U_Server.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

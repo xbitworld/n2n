@@ -47,13 +47,14 @@ void SerialRW::OnRead(boost::asio::io_service &, const std::vector<unsigned char
 
 	vTemp.insert(vTemp.end(), buffer.begin(), buffer.begin() + bytesRead);
 
+	int AllBytes = vTemp.size();
+	if (AllBytes > 4096)
+	{
+		vTemp.erase(vTemp.begin(), vTemp.begin() + AllBytes - 4096);
+	}
+
 split:
 	int inewSize = vTemp.size();
-	if (inewSize > 4096)
-	{
-		vTemp.clear();
-		return;
-	}
 
 	for (int iLoop = ((ioldSize > iCmpSize) ? ioldSize - iCmpSize : 0); iLoop < inewSize; iLoop ++)
 	{

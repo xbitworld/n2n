@@ -44,5 +44,8 @@
     <ClInclude Include="..\ASIOLib\SerialRW.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\HEXSTRTable.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

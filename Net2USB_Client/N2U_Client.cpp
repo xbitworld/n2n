@@ -18,6 +18,7 @@
 #include "../CTMutexSet.h"
 #include "../ASIOLib/SerialRW.h"
 #include "../SocketLib/c_socket_client.h"
+#include "../HEXSTRTable.h"
 
 std::string strTMP;
 
@@ -30,7 +31,29 @@ ClassMutexList<CCharArray> outBuf;	//Client Read from Server
 ClassMutexList<CCharArray> Net2SerialBuffer;		//Buffer for send to serial
 ClassMutexList<CCharArray> Serial2NetBuffer;		//Buffer for send to socket
 
-													//Insert data to list, and wait for pop
+static void ThreadSafeOutput(const std::string &info)
+{
+	boost::mutex::scoped_lock	lock(io_mutex);
+	std::cout << info << std::endl;
+}
+
+void DisplayHEX(const char * headString, const char *pData, const int iLength)
+{//Display the Data
+	char * pDataStr = new char[2 * iLength + 1];
+
+	for (int iLoop = 0; iLoop < iLength; iLoop++)
+	{
+		unsigned char charTMP = pData[iLoop];
+		unsigned int charPos = charTMP;
+		pDataStr[iLoop * 2] = HEX2STRTable[charPos][0];
+		pDataStr[iLoop * 2 + 1] = HEX2STRTable[charPos][1];
+	}
+	pDataStr[iLength * 2] = '\0';
+
+	ThreadSafeOutput(std::string(headString) + std::string(pDataStr));
+}
+
+
 void PushListData(ClassMutexList<CCharArray> &buf, const char *pData, int iLen)
 {
 	CCharArray tempData(pData, iLen);
@@ -42,12 +65,6 @@ static void ThreadSafeOutput(const void * pChar)
 	std::string outputString = std::string((const char *)pChar);
 	boost::mutex::scoped_lock	lock(io_mutex);
 	std::cout << outputString << std::endl;
-}
-
-static void ThreadSafeOutput(const std::string &info)
-{
-	boost::mutex::scoped_lock	lock(io_mutex);
-	std::cout << info << std::endl;
 }
 
 static void InputCMD(void)
@@ -103,6 +120,7 @@ std::string notifyConn = "Connect&&The@@Net^^Work";
 static int getSerialData(const std::vector<unsigned char> &SerialData, int iLen)
 {
 	CCharArray tmp = CCharArray(SerialData, iLen);
+	DisplayHEX((const char *)("Serial: "), tmp.getPtr(), iLen);
 
 	if (bConn)
 	{
@@ -113,7 +131,7 @@ static int getSerialData(const std::vector<unsigned char> &SerialData, int iLen)
 		bConn = (strncmp(notifyConn.c_str(), tmp.getPtr(), iLen) == 0);
 	}
 
-	ThreadSafeOutput(std::string("Serial Data\r\n"));// +std::string(tmp.getPtr()));
+	//ThreadSafeOutput(std::string("Serial Data\r\n"));// +std::string(tmp.getPtr()));
 
 	return 0;
 }
@@ -143,34 +161,19 @@ int main(int argc, char* argv[])
 			e.Run(1);
 		});
 
-		//std::thread writeCOMThread([&sp]() {
-		//	ASIOLib::Executor e;
-		//	e.OnWorkerThreadError = [](boost::asio::io_service &, boost::system::error_code ec) { ThreadSafeOutput(std::string("SerialRW Read error (asio): ") + boost::lexical_cast<std::string>(ec)); };
-		//	e.OnWorkerThreadException = [](boost::asio::io_service &, const std::exception &ex) { ThreadSafeOutput(std::string("SerialRW Read exception (asio): ") + ex.what()); };
-
-		//	e.OnRun = [&](boost::asio::io_service &)->void
-		//	{
-		//		while (true)
-		//		{
-		//			CCharArray data = Net2SerialBuffer.get_pop();
-		//			sp->Write2Serial((unsigned char *)(data.getPtr()), data.getLength());
-		//		}
-		//	};
-		//	e.Run(1);
-		//});
-
 		std::thread writeCOMThread([&sp]() {
 			while (true)
 			{
 				CCharArray data = Net2SerialBuffer.get_pop();
+				DisplayHEX((const char *)("Netdata: "), data.getPtr(), data.getLength());
 				sp->Write2Serial((unsigned char *)(data.getPtr()), data.getLength());
 			}
 		});
 
-		//while (!bConn) 
-		//{ 
-		//	::Sleep(100); 
-		//}
+		while (!bConn) 
+		{ 
+			::Sleep(100); 
+		}
 		
 		boost::asio::ip::tcp::resolver resolver(io_service);
 		auto endpoint_iterator = resolver.resolve({ argv[2], argv[3] });

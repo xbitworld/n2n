@@ -34,15 +34,15 @@ public:
 
 	CCharArray(const std::vector<unsigned char> v, int iLen)
 	{
-		iLen = v.size();
-		if (iLen > max_length)
+		iLength = iLen;
+		if (iLength > max_length)
 		{
 			std::cout << "Out of range ! 3-Length: " << iLength << std::endl;
 		}
 
-		pArray = new char[iLen];
+		pArray = new char[iLength];
 
-		for (int i = 0; i < iLen; i++)
+		for (int i = 0; i < iLength; i++)
 		{
 			*(pArray + i) = v[i];
 		}

@@ -152,6 +152,7 @@
     <ClInclude Include="..\ASIOLib\SerialPort.h" />
     <ClInclude Include="..\ASIOLib\SerialRW.h" />
     <ClInclude Include="..\CTMutexSet.h" />
+    <ClInclude Include="..\HEXSTRTable.h" />
     <ClInclude Include="..\SocketLib\c_socket_client.h" />
     <ClInclude Include="N2U_Client.h" />
   </ItemGroup>
