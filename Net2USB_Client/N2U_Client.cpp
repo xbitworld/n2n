@@ -13,6 +13,7 @@
 #include <boost/program_options.hpp>
 #include <iostream>
 #include <thread>
+#include <iomanip> 
 
 #include "N2U_Client.h"
 #include "../CTMutexSet.h"
@@ -133,6 +134,18 @@ static int getSerialData(const std::vector<unsigned char> &SerialData, int iLen)
 
 	//ThreadSafeOutput(std::string("Serial Data\r\n"));// +std::string(tmp.getPtr()));
 
+	std::time_t t = std::time(NULL);
+	struct tm now;
+	char mbstr[100];
+	::localtime_s(&now, &t);
+	std::strftime(mbstr, sizeof(mbstr), "%T R: ", &now);
+
+	char strLen[20] = { 0 };
+	::_itoa_s(tmp.getLength(), strLen, 10);
+
+	strTMP = std::string(mbstr) + std::string(strLen);
+	ThreadSafeOutput(strTMP.c_str());
+
 	return 0;
 }
 
@@ -150,7 +163,7 @@ int main(int argc, char* argv[])
 		strTMP = std::string("Serial: " + std::string(argv[1]) + ", Address: " + std::string(argv[2]) + ", Port: " + argv[3]);
 		ThreadSafeOutput(strTMP.c_str());
 
-		const boost::shared_ptr<SerialRW> sp(new SerialRW(getSerialData, argv[1], 256000));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
+		const boost::shared_ptr<SerialRW> sp(new SerialRW(getSerialData, argv[1], 512000));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
 
 		std::thread readCOMThread([&sp]() {
 			ASIOLib::Executor e;
@@ -167,6 +180,18 @@ int main(int argc, char* argv[])
 				CCharArray data = Net2SerialBuffer.get_pop();
 				//DisplayHEX((const char *)("Netdata: "), data.getPtr(), data.getLength());
 				sp->Write2Serial((unsigned char *)(data.getPtr()), data.getLength());
+
+				std::time_t t = std::time(NULL);
+				struct tm now;
+				char mbstr[100];
+				::localtime_s(&now, &t);
+				std::strftime(mbstr, sizeof(mbstr), "%T W: ", &now);
+
+				char strLen[20] = { 0 };
+				::_itoa_s(data.getLength(), strLen, 10);
+
+				strTMP = std::string(mbstr) + std::string(strLen);
+				ThreadSafeOutput(strTMP.c_str());
 			}
 		});
 

@@ -16,15 +16,12 @@ namespace dtCSC
 			[this, tmpV]()
 		{
 			bool write_in_progress = !write_msgs_.empty();
-			while (write_in_progress)
+			if (write_in_progress)
 			{
-				write_in_progress = !write_msgs_.empty();
-				ThreadSafeOutput("Write ...... : ");
+				ThreadSafeOutput("write_msgs_ not empty!");
 			}
-			{
-				write_msgs_.push_back(tmpV);
-				do_write();
-			}
+			write_msgs_.push_back(tmpV);
+			do_write();
 		});
 	}
 
