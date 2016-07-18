@@ -48,9 +48,9 @@ void SerialRW::OnRead(boost::asio::io_service &, const std::vector<unsigned char
 	vTemp.insert(vTemp.end(), buffer.begin(), buffer.begin() + bytesRead);
 
 	int AllBytes = vTemp.size();
-	if (AllBytes > 4096)
+	if (AllBytes > max_length)
 	{
-		vTemp.erase(vTemp.begin(), vTemp.begin() + AllBytes - 4096);
+		vTemp.erase(vTemp.begin(), vTemp.begin() + AllBytes - max_length);
 	}
 
 split:

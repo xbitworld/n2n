@@ -5,6 +5,8 @@
 
 class SerialRW : private boost::noncopyable, public boost::enable_shared_from_this<SerialRW> 
 {
+	enum { max_length = 4096 };
+
 	boost::shared_ptr<ASIOLib::SerialPort> _serialPort;
 	std::string _portName;
 	unsigned int _baudRate;

@@ -176,7 +176,7 @@ private:
 static int getSerialData(const std::vector<unsigned char> &SerialData, int iLen)
 {
 	CCharArray tmp = CCharArray(SerialData, iLen);
-	DisplayHEX((const char *)("Serial: "), tmp.getPtr(), iLen);
+	//DisplayHEX((const char *)("Serial: "), tmp.getPtr(), iLen);
 
 	Serial2NetBuffer.put(tmp);
 	//ThreadSafeOutput(std::string("Serial Data \r\n"));
@@ -197,7 +197,7 @@ int main(int argc, char* argv[])
 		strTMP = std::string("Serial: " + std::string(argv[1]) + ", Address: " + std::string(argv[2]) + ", Port: " + argv[3]);
 		ThreadSafeOutput(strTMP.c_str());
 
-		const boost::shared_ptr<SerialRW> sp(new SerialRW(getSerialData, argv[1], 9600));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
+		const boost::shared_ptr<SerialRW> sp(new SerialRW(getSerialData, argv[1], 256000));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
 
 		std::thread readCOMThread([&sp](){
 			ASIOLib::Executor e;
