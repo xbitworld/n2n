@@ -54,13 +54,6 @@ void DisplayHEX(const char * headString, const char *pData, const int iLength)
 	ThreadSafeOutput(std::string(headString) + std::string(pDataStr));
 }
 
-
-void PushListData(ClassMutexList<CCharArray> &buf, const char *pData, int iLen)
-{
-	CCharArray tempData(pData, iLen);
-	buf.put(tempData);
-}
-
 static void ThreadSafeOutput(const void * pChar)
 {
 	std::string outputString = std::string((const char *)pChar);
@@ -86,19 +79,8 @@ static void InputCMD(void)
 		}
 
 		msg += "\r\n";
-		PushListData(Net2SerialBuffer, msg.c_str(), msg.size());
 	}
 }
-//
-//static void readNetData(dtCSC::CSocketClient &csc, ClassMutexList<CCharArray> &dataList)
-//{
-//	while (true)
-//	{
-//		CCharArray tempData = dataList.get_pop();
-//		ThreadSafeOutput(tempData.getPtr());
-//	}
-//	csc.close();
-//}
 
 static void writeNetData(dtCSC::CSocketClient &csc, ClassMutexList<CCharArray> &dataList)
 {
@@ -112,7 +94,7 @@ static void writeNetData(dtCSC::CSocketClient &csc, ClassMutexList<CCharArray> &
 		}
 		csc.write(tempData.getPtr(), tempData.getLength());
 	}
-	csc.close();
+	csc.Close();
 }
 
 //Get data from Serial Port, then the function be calledback
@@ -159,7 +141,6 @@ int main(int argc, char* argv[])
 			return 1;
 		}
 
-		boost::asio::io_service io_service;
 		strTMP = std::string("Serial: " + std::string(argv[1]) + ", Address: " + std::string(argv[2]) + ", Port: " + argv[3]);
 		ThreadSafeOutput(strTMP.c_str());
 
@@ -200,6 +181,7 @@ int main(int argc, char* argv[])
 			::Sleep(100); 
 		}
 		
+		boost::asio::io_service io_service;
 		boost::asio::ip::tcp::resolver resolver(io_service);
 		auto endpoint_iterator = resolver.resolve({ argv[2], argv[3] });
 		dtCSC::CSocketClient custSocket(io_service, endpoint_iterator, std::ref(Net2SerialBuffer), ThreadSafeOutput);

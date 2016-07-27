@@ -47,6 +47,7 @@ void SerialRW::OnRead(boost::asio::io_service &, const std::vector<unsigned char
 
 	vTemp.insert(vTemp.end(), buffer.begin(), buffer.begin() + bytesRead);
 
+	//此处代码需要修改！！！！
 	int AllBytes = vTemp.size();
 	if (AllBytes > max_length)
 	{

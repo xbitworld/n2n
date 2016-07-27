@@ -29,11 +29,11 @@ namespace dtCSC
 			do_connect(end_iterator);
 		}
 
-		void close();
+		void Close();
 
 		~CSocketClient()
 		{
-			close();
+			Close();
 		}
 
 		void write(const char *pData, int iLen);

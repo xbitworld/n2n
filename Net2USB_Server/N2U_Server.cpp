@@ -120,6 +120,13 @@ private:
 				Net2SerialBuffer.put(CCharArray(data_, length));
 				do_read();
 			}
+			else if(ec.value() == 2)
+			{
+				//char strVal[20] = { 0 };
+				//sprintf_s(strVal, "Code: %d, Message: ", ec.value());
+				//ThreadSafeOutput(strVal + ec.message());
+				ThreadSafeOutput("Disconnected");
+			}
 		});
 	}
 

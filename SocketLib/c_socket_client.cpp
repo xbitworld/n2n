@@ -25,7 +25,7 @@ namespace dtCSC
 		});
 	}
 
-	void CSocketClient::close()
+	void CSocketClient::Close()
 	{
 		io_service_.post([this]() { socket_.close(); });
 	}
@@ -58,7 +58,7 @@ namespace dtCSC
 		ThreadSafeOutput("Reconnect");
 		
 		if(socket_.is_open())
-			close();
+			Close();
 			
 		boost::asio::async_connect(socket_, end_iterator,
 		[this](boost::system::error_code ec, boost::asio::ip::tcp::resolver::iterator)
@@ -90,8 +90,9 @@ namespace dtCSC
 			}
 			else
 			{
-				::Sleep(1000);
-				ReConnect();
+				//::Sleep(1000);
+				//ReConnect();
+				Close();
 			}
 		});
 	}
@@ -113,8 +114,9 @@ namespace dtCSC
 			}
 			else
 			{
-				::Sleep(1000);
-				ReConnect();
+				//::Sleep(1000);
+				//ReConnect();
+				Close();
 			}
 		});
 	}
