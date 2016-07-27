@@ -76,7 +76,8 @@ static void InputCMD(void)
 		}
 
 		msg += "\r\n";
-		PushListData(Net2SerialBuffer, msg.c_str(), msg.size());
+//		PushListData(Net2SerialBuffer, msg.c_str(), msg.size());
+		PushListData(Serial2NetBuffer, msg.c_str(), msg.size());
 	}
 }
 
@@ -95,15 +96,25 @@ public:
 		do_read();
 	}
 
+	void Close()
+	{
+		socket_.cancel();
+		socket_.close();
+		ThreadSafeOutput("Disconnected");
+	}
+
 	void do_write(const char *pData, std::size_t length)
 	{
 		auto self(shared_from_this());
 		boost::asio::async_write(socket_, boost::asio::buffer(pData, length),
 			[this, self](boost::system::error_code ec, std::size_t /*length*/)
 		{
-			if (!ec)
+			if ((ec.value() == boost::asio::error::eof) || (ec.value() == boost::asio::error::connection_reset))
 			{
-				return;
+				char strVal[200] = { 0 };
+				sprintf_s(strVal, "Read Error, Code: %d, Message: ", ec.value());
+				ThreadSafeOutput(strVal + ec.message());
+				self->Close();
 			}
 		});
 	}
@@ -120,12 +131,12 @@ private:
 				Net2SerialBuffer.put(CCharArray(data_, length));
 				do_read();
 			}
-			else if(ec.value() == 2)
+			else if((ec.value() == boost::asio::error::eof) || (ec.value() == boost::asio::error::connection_reset))
 			{
-				//char strVal[20] = { 0 };
-				//sprintf_s(strVal, "Code: %d, Message: ", ec.value());
-				//ThreadSafeOutput(strVal + ec.message());
-				ThreadSafeOutput("Disconnected");
+				char strVal[200] = { 0 };
+				sprintf_s(strVal, "Read Error, Code: %d, Message: ", ec.value());
+				ThreadSafeOutput(strVal + ec.message());
+				self->Close();
 			}
 		});
 	}
