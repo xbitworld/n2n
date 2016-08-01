@@ -13,10 +13,10 @@ class SerialRW : private boost::noncopyable, public boost::enable_shared_from_th
 
 	void OnRead(boost::asio::io_service &ios, const std::vector<unsigned char> &buffer, size_t bytesRead);
 
-	int (*_getDataCall)(const std::vector<unsigned char> &buffer, int iLen);
+	int (*_getDataCall)(size_t hash, const std::vector<unsigned char> &buffer, int iLen);
 
 public:
-	SerialRW(int (*getDataCall)(const std::vector<unsigned char> &, int), const std::string &portName, int baudRate) :
+	SerialRW(int (*getDataCall)(size_t hash, const std::vector<unsigned char> &, int), const std::string &portName, int baudRate) :
 		_getDataCall(getDataCall), _portName(portName), _baudRate(baudRate) 
 	{
 	}
@@ -32,5 +32,5 @@ public:
 		}
 	}
 
-	void Write2Serial(unsigned char *pData, int iLen);
+	void Write2Serial(unsigned char *pData, int iLen, size_t hash);
 };

@@ -85,7 +85,15 @@ split:
 			if (iStartPos >= 0)
 			{
 				dataTemp.erase(dataTemp.begin(), dataTemp.begin() + iStartPos + split_head.size());
-				_getDataCall(dataTemp, dataTemp.size());
+
+				std::vector<unsigned char> vHash(dataTemp.begin(), dataTemp.begin() + 20);
+
+				dataTemp.erase(dataTemp.begin(), dataTemp.begin() + 20);
+
+				unsigned char * pHash = vHash.data();
+				size_t Hash = atoll((const char *)pHash);
+
+				_getDataCall(Hash, dataTemp, dataTemp.size());
 			}
 			ioldSize = 0;
 
@@ -94,9 +102,14 @@ split:
 	}
 }
 
-void SerialRW::Write2Serial(unsigned char *pData, int iLen)
+void SerialRW::Write2Serial(unsigned char *pData, int iLen, size_t hash)
 {
+	//Need test the bits account
+	char charHash[30] = { 0 };
+	sprintf_s(charHash, "%ll020d", hash);
+
 	_serialPort->Write((unsigned char *)(split_head.c_str()), split_head.size());
+	_serialPort->Write((unsigned char *)charHash, 20);
 	_serialPort->Write(pData, iLen);
 	_serialPort->Write((unsigned char *)(split_end.c_str()), split_end.size());
 }

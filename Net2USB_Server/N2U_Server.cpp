@@ -29,10 +29,14 @@ boost::mutex io_mutex;	//mutex for console display
 ClassMutexList<CCharArray> Net2SerialBuffer;		//Buffer for send to serial
 ClassMutexList<CCharArray> Serial2NetBuffer;		//Buffer for send to socket
 
+std::hash<boost::asio::ip::tcp::socket> hash_socket;
+
+std::string disconnectFlag("*&DISC&*");
+std::string notifyConn = "Connect&&The@@Net^^Work";
+
 //Insert data to list, and wait for pop
-void PushListData(ClassMutexList<CCharArray> &buf, const char *pData, int iLen)
+void PushListData(ClassMutexList<CCharArray> &buf, CCharArray &tempData)
 {
-	CCharArray tempData(pData, iLen);
 	buf.put(tempData);
 }
 
@@ -92,15 +96,37 @@ public:
 
 	void start()
 	{
+		Net2SerialBuffer.put(CCharArray(hash_socket(socket_), notifyConn.c_str(), notifyConn.length()));
 		//do_write("Net Start\r\n", 11);
 		do_read();
 	}
 
+	size_t getSocketHash()
+	{
+		return hash_socket(socket_);
+	}
+
 	void Close()
 	{
-		socket_.cancel();
-		socket_.close();
-		ThreadSafeOutput("Disconnected");
+		char charTMP[200];
+
+		boost::system::error_code ec;
+		boost::asio::ip::address v4address;
+		socket_.remote_endpoint(ec).address(v4address);
+		if (!ec)
+		{
+			sprintf_s(charTMP, "IP:%s, Port:%d", v4address.to_string(), socket_.remote_endpoint().port());
+			socket_.cancel();
+			socket_.close();
+			ThreadSafeOutput(std::string(charTMP) + std::string("Disconnected"));
+		}
+		else
+		{
+			sprintf_s(charTMP, "Close Error, Code: %d, Message: ", ec.value());
+			ThreadSafeOutput(charTMP + ec.message());
+		}
+
+		PushListData(Net2SerialBuffer, CCharArray(hash_socket(socket_), disconnectFlag.c_str(), (int)disconnectFlag.size()));
 	}
 
 	void do_write(const char *pData, std::size_t length)
@@ -112,7 +138,7 @@ public:
 			if ((ec.value() == boost::asio::error::eof) || (ec.value() == boost::asio::error::connection_reset))
 			{
 				char strVal[200] = { 0 };
-				sprintf_s(strVal, "Read Error, Code: %d, Message: ", ec.value());
+				sprintf_s(strVal, "Write Error, Code: %d, Message: ", ec.value());
 				ThreadSafeOutput(strVal + ec.message());
 				self->Close();
 			}
@@ -128,7 +154,7 @@ private:
 		{
 			if (!ec)
 			{
-				Net2SerialBuffer.put(CCharArray(data_, length));
+				Net2SerialBuffer.put(CCharArray(hash_socket(socket_), data_, length));
 				do_read();
 			}
 			else if((ec.value() == boost::asio::error::eof) || (ec.value() == boost::asio::error::connection_reset))
@@ -146,12 +172,14 @@ private:
 	char data_[max_length];
 };
 
+ClassMutexList<std::shared_ptr<SocketSession>> sessionList;
+
 class NetServer
 {
 public:
 	NetServer(boost::asio::io_service& io_service, tcp::endpoint endpoint)
 		: acceptor_(io_service, endpoint),
-		socket_(io_service)
+		io_service_(io_service)
 	{
 		do_accept();
 	}
@@ -164,32 +192,31 @@ public:
 private:
 	void do_accept()
 	{
+		tcp::socket socket_(io_service_);
 		acceptor_.async_accept(socket_,
-			[this](boost::system::error_code ec)
+			[&socket_, this](boost::system::error_code ec)
 		{
 			if (!ec)
 			{
 				ThreadSafeOutput("Accept");
 				_pSocketSession = std::make_shared<SocketSession>(std::move(socket_));
 				_pSocketSession->start();
-
-				std::string notifyConn = "Connect&&The@@Net^^Work";
-				Net2SerialBuffer.put(CCharArray(notifyConn.c_str(), notifyConn.length()));
+				sessionList.put(_pSocketSession);
 			}
 
 			do_accept();
 		});
 	}
 
+	boost::asio::io_service& io_service_;
 	tcp::acceptor acceptor_;
-	tcp::socket socket_;
 	std::shared_ptr<SocketSession> _pSocketSession;
 };
 
 //Get data from Serial Port, then the function be calledback
-static int getSerialData(const std::vector<unsigned char> &SerialData, int iLen)
+static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialData, int iLen)
 {
-	CCharArray tmp = CCharArray(SerialData, iLen);
+	CCharArray tmp = CCharArray(Hash, SerialData, iLen);
 	//DisplayHEX((const char *)("Serial: "), tmp.getPtr(), iLen);
 
 	Serial2NetBuffer.put(tmp);
@@ -238,7 +265,8 @@ int main(int argc, char* argv[])
 			while (true)
 			{
 				CCharArray data = Net2SerialBuffer.get_pop();
-				sp->Write2Serial((unsigned char *)(data.getPtr()), data.getLength());
+
+				sp->Write2Serial((unsigned char *)(data.getPtr()), data.getLength(), data.getHash());
 
 				std::time_t t = std::time(NULL);
 				struct tm now;
@@ -264,7 +292,17 @@ int main(int argc, char* argv[])
 			while (true)
 			{
 				CCharArray data = Serial2NetBuffer.get_pop();
-				SocketServer.write(data.getPtr(), data.getLength());
+
+				//May be lost the chance for writing when sessionList be changed in the loop
+				//getCount every time to avoid out of rang
+				for (int iLoop = 0; iLoop < sessionList.getCount(); iLoop ++)
+				{
+					if (sessionList[iLoop]->getSocketHash() == data.getHash())
+					{
+						sessionList[iLoop]->do_write(data.getPtr(), data.getLength());
+						break;
+					}
+				}
 			}
 		});
 

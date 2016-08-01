@@ -8,11 +8,13 @@
 
 class CCharArray
 {
-	enum { max_length = 4095 };
+	enum { max_length = 4096 };
 
 public:
-	CCharArray(int ilen) :iLength(ilen)
+	CCharArray(size_t hash, int ilen) :iLength(ilen)
 	{
+		objHash = hash;
+
 		if (iLength > max_length)
 		{
 			std::cout << "Out of range ! 1-Length: " << iLength << std::endl;
@@ -20,8 +22,10 @@ public:
 		pArray = new char[iLength];
 	}
 
-	CCharArray(const char *pStr, int iLen)
+	CCharArray(size_t hash, const char *pStr, int iLen)
 	{
+		objHash = hash;
+
 		iLength = iLen;
 		if (iLength > max_length)
 		{
@@ -32,8 +36,10 @@ public:
 		std::memcpy(pArray, pStr, iLength);
 	}
 
-	CCharArray(const std::vector<unsigned char> v, int iLen)
+	CCharArray(size_t hash, const std::vector<unsigned char> v, int iLen)
 	{
+		objHash = hash;
+
 		iLength = iLen;
 		if (iLength > max_length)
 		{
@@ -50,6 +56,7 @@ public:
 
 	CCharArray(const CCharArray &src)
 	{
+		objHash = src.getHash();
 		iLength = src.getLength();
 		if (iLength > max_length)
 		{
@@ -70,6 +77,7 @@ public:
 			return *this;
 		}
 
+		objHash = src.getHash();
 		iLength = src.getLength();
 		char *charTMP = new char[iLength];
 		std::memcpy(charTMP, src.pArray, iLength);
@@ -84,6 +92,7 @@ public:
 	CCharArray(CCharArray &&src)
 	{
 		//		std::cout << "Copy Move" << std::endl;
+		objHash = src.getHash();
 		pArray = src.NullArray(iLength);
 	}
 
@@ -94,6 +103,7 @@ public:
 		{
 			return *this;
 		}
+		objHash = src.getHash();
 
 		if (pArray != nullptr)
 			delete[] pArray;
@@ -107,6 +117,7 @@ public:
 			delete[] pArray;
 
 		pArray = nullptr;
+		objHash = 0;
 	}
 
 	char * NullArray(int &iLen)
@@ -118,12 +129,15 @@ public:
 
 		iLength = 0;
 		pArray = nullptr;
+		objHash = 0;
 
 		return pTMP;
 	}
 
-	void put(const char *pStr, int ilen)
+	void put(size_t hash, const char *pStr, int ilen)
 	{
+		objHash = hash;
+
 		iLength = ilen;
 		if (iLength > max_length)
 		{
@@ -143,7 +157,13 @@ public:
 		return pArray;
 	}
 
+	const size_t getHash() const
+	{
+		return objHash;
+	}
+
 private:
+	size_t objHash;
 	int iLength;
 	char *pArray = nullptr;
 };
@@ -178,6 +198,21 @@ public:
 		TList.push_back(m);
 		++full;
 		cond.notify_all();
+	}
+
+	T & ClassMutexList::operator [](int n)
+	{
+		scoped_lock lock(mutex);
+		if (full == 0)
+		{
+			while (full == 0)
+				cond.wait(lock);
+			//			std::cout << "Wait for get Last!" << std::endl;
+		}
+		T tmp = TList[n];
+		cond.notify_all();
+
+		return tmp;
 	}
 
 	T get_last()
@@ -218,7 +253,7 @@ public:
 		int iCounter = full;
 		return iCounter;
 	}
-
+	//²âÊÔlock~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!!!!!!!!!!!!!!!!!!!!!!!
 	void lock()
 	{
 		mutex.lock();

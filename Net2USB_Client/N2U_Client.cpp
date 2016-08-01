@@ -32,6 +32,10 @@ ClassMutexList<CCharArray> outBuf;	//Client Read from Server
 ClassMutexList<CCharArray> Net2SerialBuffer;		//Buffer for send to serial
 ClassMutexList<CCharArray> Serial2NetBuffer;		//Buffer for send to socket
 
+std::string connectFlag("&*CONN*&");
+std::string disconnectFlag("*&DISC&*");
+std::string notifyConn = "Connect&&The@@Net^^Work";
+
 static void ThreadSafeOutput(const std::string &info)
 {
 	boost::mutex::scoped_lock	lock(io_mutex);
@@ -98,11 +102,25 @@ static void writeNetData(dtCSC::CSocketClient &csc, ClassMutexList<CCharArray> &
 }
 
 //Get data from Serial Port, then the function be calledback
+static std::atomic_short iConnNum = 0;
 static std::atomic_bool bConn = false;
-std::string notifyConn = "Connect&&The@@Net^^Work";
-static int getSerialData(const std::vector<unsigned char> &SerialData, int iLen)
+static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialData, int iLen)
 {
-	CCharArray tmp = CCharArray(SerialData, iLen);
+	CCharArray tmp = CCharArray(Hash, SerialData, iLen);
+
+	if(strncmp(connectFlag.c_str(), tmp.getPtr(), connectFlag.size()) == 0)
+	{
+		iConnNum++;
+		ThreadSafeOutput("to Connect");
+	}
+	else if (strncmp(disconnectFlag.c_str(), tmp.getPtr(), disconnectFlag.size()) == 0)
+	{
+		if (iConnNum > 0)
+		{
+			iConnNum--;
+		}
+		ThreadSafeOutput("to Disconnect");
+	}
 	//DisplayHEX((const char *)("Serial: "), tmp.getPtr(), iLen);
 
 	if (bConn)
@@ -130,6 +148,8 @@ static int getSerialData(const std::vector<unsigned char> &SerialData, int iLen)
 
 	return 0;
 }
+
+ClassMutexList<std::shared_ptr<dtCSC::CSocketClient>> socketList;
 
 int main(int argc, char* argv[])
 {
