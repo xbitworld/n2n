@@ -89,8 +89,8 @@ class SocketSession
 	: public std::enable_shared_from_this<SocketSession>
 {
 public:
-	SocketSession(tcp::socket socket)
-		: socket_(std::move(socket))
+	SocketSession(boost::asio::io_service& io_service)
+		: socket_(io_service)
 	{
 	}
 
@@ -99,6 +99,11 @@ public:
 		Net2SerialBuffer.put(CCharArray(hash_socket(socket_.remote_endpoint().port()), notifyConn.c_str(), notifyConn.length()));
 		//do_write("Net Start\r\n", 11);
 		do_read();
+	}
+
+	tcp::socket& getSocket()
+	{
+		return socket_;
 	}
 
 	size_t getSocketHash()
@@ -113,12 +118,13 @@ public:
 		boost::system::error_code ec;
 		boost::asio::ip::address v4address;
 		socket_.remote_endpoint(ec).address(v4address);
+		size_t socketHash = hash_socket(socket_.remote_endpoint().port());
 		if (!ec)
 		{
 			sprintf_s(charTMP, "IP:%s, Port:%d", v4address.to_string().c_str(), socket_.remote_endpoint().port());
 			socket_.cancel();
 			socket_.close();
-			ThreadSafeOutput(std::string(charTMP) + std::string("Disconnected"));
+			ThreadSafeOutput(std::string(charTMP) + std::string(", Disconnected"));
 		}
 		else
 		{
@@ -126,7 +132,7 @@ public:
 			ThreadSafeOutput(charTMP + ec.message());
 		}
 
-		PushListData(Net2SerialBuffer, CCharArray(hash_socket(socket_.remote_endpoint().port()), disconnectFlag.c_str(), (int)disconnectFlag.size()));
+		PushListData(Net2SerialBuffer, CCharArray(socketHash, disconnectFlag.c_str(), (int)disconnectFlag.size()));
 	}
 
 	void do_write(const char *pData, std::size_t length)
@@ -192,14 +198,13 @@ public:
 private:
 	void do_accept()
 	{
-		tcp::socket socket_(io_service_);
-		acceptor_.async_accept(socket_,
-			[&socket_, this](boost::system::error_code ec)
+		_pSocketSession = std::make_shared<SocketSession>(io_service_);
+		acceptor_.async_accept(_pSocketSession->getSocket(),
+			[this](boost::system::error_code ec)
 		{
 			if (!ec)
 			{
 				ThreadSafeOutput("Accept");
-				_pSocketSession = std::make_shared<SocketSession>(std::move(socket_));
 				_pSocketSession->start();
 				sessionVector.push_back(_pSocketSession);
 			}
