@@ -16,10 +16,12 @@ namespace dtCSC
 		: public std::enable_shared_from_this<CSocketClient>
 	{
 	public:
-		CSocketClient(boost::asio::io_service& io_service,
+		CSocketClient(size_t Hash,
+		boost::asio::io_service& io_service,
 		boost::asio::ip::tcp::resolver::iterator endpoint_iterator,
 		ClassMutexList<CCharArray> &pBuff, void(*pFun)(const void * pChar))
-		: io_service_(io_service)
+		: serverHash(Hash)
+		, io_service_(io_service)
 		, socket_(io_service)
 		, end_iterator(endpoint_iterator)
 		, ThreadSafeOutput(pFun)
@@ -42,6 +44,8 @@ namespace dtCSC
 
 		void ReConnect();
 
+		size_t getServerHash();
+
 	private:
 		void do_connect(boost::asio::ip::tcp::resolver::iterator endpoint_iterator);
 
@@ -58,7 +62,7 @@ namespace dtCSC
 		boost::asio::ip::tcp::resolver::iterator end_iterator;
 
 		void(*ThreadSafeOutput)(const void * pChar);
-
+		size_t serverHash;
 	};
 
 }//namespace dtCSC

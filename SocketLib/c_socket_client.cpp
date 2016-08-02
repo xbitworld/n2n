@@ -84,7 +84,7 @@ namespace dtCSC
 		{
 			if (!ec)
 			{
-				CCharArray dataTemp((const char *)pStr, length);
+				CCharArray dataTemp(serverHash, (const char *)pStr, length);
 				pReadData->put(dataTemp);
 				do_read();
 			}
@@ -120,5 +120,11 @@ namespace dtCSC
 			}
 		});
 	}
+
+	size_t CSocketClient::getServerHash()
+	{
+		return serverHash;
+	}
+
 }
 

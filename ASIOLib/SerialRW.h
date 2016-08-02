@@ -32,5 +32,5 @@ public:
 		}
 	}
 
-	void Write2Serial(unsigned char *pData, int iLen, size_t hash);
+	void Write2Serial(size_t hash, unsigned char *pData, int iLen);
 };

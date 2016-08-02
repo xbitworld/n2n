@@ -102,11 +102,11 @@ split:
 	}
 }
 
-void SerialRW::Write2Serial(unsigned char *pData, int iLen, size_t hash)
+void SerialRW::Write2Serial(size_t hash, unsigned char *pData, int iLen)
 {
 	//Need test the bits account
 	char charHash[30] = { 0 };
-	sprintf_s(charHash, "%ll020d", hash);
+	sprintf_s(charHash, "%020lld", hash);
 
 	_serialPort->Write((unsigned char *)(split_head.c_str()), split_head.size());
 	_serialPort->Write((unsigned char *)charHash, 20);

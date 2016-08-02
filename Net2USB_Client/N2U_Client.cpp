@@ -21,9 +21,12 @@
 #include "../SocketLib/c_socket_client.h"
 #include "../HEXSTRTable.h"
 
+using boost::asio::ip::tcp;
+using namespace std;
+
 std::string strTMP;
 
-using boost::asio::ip::tcp;
+std::string strDestIP, strDestPort;	//The target IP & Port
 
 boost::mutex io_mutex;	//mutex for console display
 ClassMutexList<CCharArray> inBuf;		//Client Send to Server
@@ -34,7 +37,19 @@ ClassMutexList<CCharArray> Serial2NetBuffer;		//Buffer for send to socket
 
 std::string connectFlag("&*CONN*&");
 std::string disconnectFlag("*&DISC&*");
-std::string notifyConn = "Connect&&The@@Net^^Work";
+
+class CommPair
+{
+public:
+	CommPair() {}
+
+	boost::thread *pTH;
+	size_t serverHash;
+	dtCSC::CSocketClient *pClientSocket;
+};
+
+std::vector<CommPair> commVector;
+//ClassMutexList<std::shared_ptr<dtCSC::CSocketClient>> socketList;
 
 static void ThreadSafeOutput(const std::string &info)
 {
@@ -86,70 +101,107 @@ static void InputCMD(void)
 	}
 }
 
-static void writeNetData(dtCSC::CSocketClient &csc, ClassMutexList<CCharArray> &dataList)
+void newConnect(CommPair &commObj)
+{
+	boost::asio::io_service io_service;
+	boost::asio::ip::tcp::resolver resolver(io_service);
+	auto endpoint_iterator = resolver.resolve({ strDestIP, strDestPort });
+
+	commObj.pClientSocket = new dtCSC::CSocketClient(commObj.serverHash, io_service, endpoint_iterator, std::ref(Net2SerialBuffer), ThreadSafeOutput);
+	commObj.pTH = new boost::thread([&io_service]() { io_service.run(); });
+
+	//commObj.pTH->join();
+}
+
+static void writeNetData(ClassMutexList<CCharArray> &dataList)
 {
 	while (true)
 	{
 		CCharArray tempData = dataList.get_pop();
 
-		if (!csc.isSocketOpen())
+		for each (auto commTMP in ((std::vector<CommPair>)(commVector)))
 		{
-			csc.ReConnect();
+			if (commTMP.serverHash == tempData.getHash())
+			{
+				commTMP.pClientSocket->write(tempData.getPtr(), tempData.getLength());
+			}
 		}
-		csc.write(tempData.getPtr(), tempData.getLength());
 	}
-	csc.Close();
 }
 
 //Get data from Serial Port, then the function be calledback
-static std::atomic_short iConnNum = 0;
-static std::atomic_bool bConn = false;
 static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialData, int iLen)
 {
+	int iEvent = 0;
 	CCharArray tmp = CCharArray(Hash, SerialData, iLen);
 
 	if(strncmp(connectFlag.c_str(), tmp.getPtr(), connectFlag.size()) == 0)
 	{
-		iConnNum++;
 		ThreadSafeOutput("to Connect");
+
+		CommPair commObj;
+		commObj.serverHash = Hash;
+		newConnect(commObj);
+
+		//std::thread(bind(newConnect, _1, commObj));
+
+		((std::vector<CommPair>)(commVector)).push_back(commObj);
+
+		iEvent = 1;
 	}
 	else if (strncmp(disconnectFlag.c_str(), tmp.getPtr(), disconnectFlag.size()) == 0)
 	{
-		if (iConnNum > 0)
-		{
-			iConnNum--;
-		}
 		ThreadSafeOutput("to Disconnect");
+
+		int iCount = 0;
+		for each (auto commTMP in ((std::vector<CommPair>)(commVector)))
+		{
+			if (commTMP.serverHash == Hash)
+			{
+				commTMP.pTH->interrupt();
+				commTMP.pClientSocket->Close();
+
+				delete commTMP.pTH;
+				delete commTMP.pClientSocket;
+
+				((std::vector<CommPair>)(commVector)).erase(((std::vector<CommPair>)(commVector)).begin() + iCount);
+				iEvent = 2;
+			}
+			iCount++;
+		}
+
+		iEvent = 3;
 	}
 	//DisplayHEX((const char *)("Serial: "), tmp.getPtr(), iLen);
-
-	if (bConn)
-	{
-		Serial2NetBuffer.put(tmp);
-	}
-	else
-	{
-		bConn = (strncmp(notifyConn.c_str(), tmp.getPtr(), iLen) == 0);
-	}
-
-	//ThreadSafeOutput(std::string("Serial Data\r\n"));// +std::string(tmp.getPtr()));
+	std::string lstrTMP;
 
 	std::time_t t = std::time(NULL);
 	struct tm now;
 	char mbstr[100];
 	::localtime_s(&now, &t);
-	std::strftime(mbstr, sizeof(mbstr), "%T R: ", &now);
+	std::strftime(mbstr, sizeof(mbstr), "%T ", &now);
 
-	char strLen[20] = { 0 };
-	::_itoa_s(tmp.getLength(), strLen, 10);
+	if (iEvent != 0)
+	{
+		char strEvent[100];
+		sprintf_s(strEvent, "Event: %d", iEvent);
+		lstrTMP = std::string(mbstr)+ std::string(strEvent);
+	}
+	else
+	{
+		Serial2NetBuffer.put(tmp);
+		//ThreadSafeOutput(std::string("Serial Data\r\n"));// +std::string(tmp.getPtr()));
 
-	strTMP = std::string(mbstr) + std::string(strLen);
-	ThreadSafeOutput(strTMP.c_str());
+		char strLen[100] = { 0 };
+		::_itoa_s(tmp.getLength(), strLen, 10);
+
+		lstrTMP = std::string(mbstr) + std::string(strLen);
+	}
+
+	ThreadSafeOutput(lstrTMP);
 
 	return 0;
 }
-
-ClassMutexList<std::shared_ptr<dtCSC::CSocketClient>> socketList;
 
 int main(int argc, char* argv[])
 {
@@ -161,7 +213,10 @@ int main(int argc, char* argv[])
 			return 1;
 		}
 
-		strTMP = std::string("Serial: " + std::string(argv[1]) + ", Address: " + std::string(argv[2]) + ", Port: " + argv[3]);
+		strDestIP = argv[2];
+		strDestPort = argv[3];
+
+		strTMP = std::string("Serial: " + std::string(argv[1]) + ", Address: " + strDestIP + ", Port: " + strDestPort);
 		ThreadSafeOutput(strTMP.c_str());
 
 		const boost::shared_ptr<SerialRW> sp(new SerialRW(getSerialData, argv[1], 512000));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
@@ -180,7 +235,7 @@ int main(int argc, char* argv[])
 			{
 				CCharArray data = Net2SerialBuffer.get_pop();
 				//DisplayHEX((const char *)("Netdata: "), data.getPtr(), data.getLength());
-				sp->Write2Serial((unsigned char *)(data.getPtr()), data.getLength());
+				sp->Write2Serial(data.getHash(), (unsigned char *)(data.getPtr()), data.getLength());
 
 				std::time_t t = std::time(NULL);
 				struct tm now;
@@ -195,25 +250,13 @@ int main(int argc, char* argv[])
 				ThreadSafeOutput(strTMP.c_str());
 			}
 		});
-
-		while (!bConn) 
-		{ 
-			::Sleep(100); 
-		}
 		
-		boost::asio::io_service io_service;
-		boost::asio::ip::tcp::resolver resolver(io_service);
-		auto endpoint_iterator = resolver.resolve({ argv[2], argv[3] });
-		dtCSC::CSocketClient custSocket(io_service, endpoint_iterator, std::ref(Net2SerialBuffer), ThreadSafeOutput);
-
-		std::thread socketRCVThread([&io_service]() { io_service.run(); });
-		std::thread writeNetThread(writeNetData, std::ref(custSocket), std::ref(Serial2NetBuffer));
+		std::thread writeNetThread(writeNetData, std::ref(Serial2NetBuffer));
 
 		std::thread InputCMDThread(InputCMD);
 
 		readCOMThread.join();
 		writeCOMThread.join();
-		socketRCVThread.join();
 		writeNetThread.join();
 
 		InputCMDThread.join();

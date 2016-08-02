@@ -112,7 +112,7 @@ public:
 	}
 
 	virtual ~CCharArray()
-	{//To avoid deconstruct many times
+	{//To avoid decon9struct many times
 		if (pArray != nullptr)
 			delete[] pArray;
 
@@ -198,21 +198,6 @@ public:
 		TList.push_back(m);
 		++full;
 		cond.notify_all();
-	}
-
-	T & ClassMutexList::operator [](int n)
-	{
-		scoped_lock lock(mutex);
-		if (full == 0)
-		{
-			while (full == 0)
-				cond.wait(lock);
-			//			std::cout << "Wait for get Last!" << std::endl;
-		}
-		T tmp = TList[n];
-		cond.notify_all();
-
-		return tmp;
 	}
 
 	T get_last()

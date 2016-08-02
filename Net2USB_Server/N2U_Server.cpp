@@ -29,13 +29,13 @@ boost::mutex io_mutex;	//mutex for console display
 ClassMutexList<CCharArray> Net2SerialBuffer;		//Buffer for send to serial
 ClassMutexList<CCharArray> Serial2NetBuffer;		//Buffer for send to socket
 
-std::hash<boost::asio::ip::tcp::socket> hash_socket;
+std::hash<int> hash_socket;
 
 std::string disconnectFlag("*&DISC&*");
-std::string notifyConn = "Connect&&The@@Net^^Work";
+std::string notifyConn("&*CONN*&");
 
 //Insert data to list, and wait for pop
-void PushListData(ClassMutexList<CCharArray> &buf, CCharArray &tempData)
+void PushListData(ClassMutexList<CCharArray> &buf, const CCharArray &tempData)
 {
 	buf.put(tempData);
 }
@@ -79,9 +79,9 @@ static void InputCMD(void)
 			exit(0);
 		}
 
-		msg += "\r\n";
-//		PushListData(Net2SerialBuffer, msg.c_str(), msg.size());
-		PushListData(Serial2NetBuffer, msg.c_str(), msg.size());
+		//msg += "\r\n";
+		//const CCharArray msgA(0, msg.c_str(), msg.size());
+		//PushListData(Serial2NetBuffer, msgA);
 	}
 }
 
@@ -96,14 +96,14 @@ public:
 
 	void start()
 	{
-		Net2SerialBuffer.put(CCharArray(hash_socket(socket_), notifyConn.c_str(), notifyConn.length()));
+		Net2SerialBuffer.put(CCharArray(hash_socket(socket_.remote_endpoint().port()), notifyConn.c_str(), notifyConn.length()));
 		//do_write("Net Start\r\n", 11);
 		do_read();
 	}
 
 	size_t getSocketHash()
 	{
-		return hash_socket(socket_);
+		return hash_socket(socket_.remote_endpoint().port());
 	}
 
 	void Close()
@@ -115,7 +115,7 @@ public:
 		socket_.remote_endpoint(ec).address(v4address);
 		if (!ec)
 		{
-			sprintf_s(charTMP, "IP:%s, Port:%d", v4address.to_string(), socket_.remote_endpoint().port());
+			sprintf_s(charTMP, "IP:%s, Port:%d", v4address.to_string().c_str(), socket_.remote_endpoint().port());
 			socket_.cancel();
 			socket_.close();
 			ThreadSafeOutput(std::string(charTMP) + std::string("Disconnected"));
@@ -126,7 +126,7 @@ public:
 			ThreadSafeOutput(charTMP + ec.message());
 		}
 
-		PushListData(Net2SerialBuffer, CCharArray(hash_socket(socket_), disconnectFlag.c_str(), (int)disconnectFlag.size()));
+		PushListData(Net2SerialBuffer, CCharArray(hash_socket(socket_.remote_endpoint().port()), disconnectFlag.c_str(), (int)disconnectFlag.size()));
 	}
 
 	void do_write(const char *pData, std::size_t length)
@@ -154,7 +154,7 @@ private:
 		{
 			if (!ec)
 			{
-				Net2SerialBuffer.put(CCharArray(hash_socket(socket_), data_, length));
+				Net2SerialBuffer.put(CCharArray(hash_socket(socket_.remote_endpoint().port()), data_, length));
 				do_read();
 			}
 			else if((ec.value() == boost::asio::error::eof) || (ec.value() == boost::asio::error::connection_reset))
@@ -172,7 +172,7 @@ private:
 	char data_[max_length];
 };
 
-ClassMutexList<std::shared_ptr<SocketSession>> sessionList;
+std::vector<std::shared_ptr<SocketSession>> sessionVector;
 
 class NetServer
 {
@@ -201,7 +201,7 @@ private:
 				ThreadSafeOutput("Accept");
 				_pSocketSession = std::make_shared<SocketSession>(std::move(socket_));
 				_pSocketSession->start();
-				sessionList.put(_pSocketSession);
+				sessionVector.push_back(_pSocketSession);
 			}
 
 			do_accept();
@@ -266,7 +266,7 @@ int main(int argc, char* argv[])
 			{
 				CCharArray data = Net2SerialBuffer.get_pop();
 
-				sp->Write2Serial((unsigned char *)(data.getPtr()), data.getLength(), data.getHash());
+				sp->Write2Serial(data.getHash(), (unsigned char *)(data.getPtr()), data.getLength());
 
 				std::time_t t = std::time(NULL);
 				struct tm now;
@@ -288,18 +288,18 @@ int main(int argc, char* argv[])
 		NetServer SocketServer(io_service, endpoint);
 
 		std::thread socketReadThread([&io_service]() { io_service.run(); });
-		std::thread socketWriteThread([&SocketServer]() {
+		std::thread socketWriteThread([] {
 			while (true)
 			{
 				CCharArray data = Serial2NetBuffer.get_pop();
 
 				//May be lost the chance for writing when sessionList be changed in the loop
 				//getCount every time to avoid out of rang
-				for (int iLoop = 0; iLoop < sessionList.getCount(); iLoop ++)
+				for (int iLoop = 0; iLoop < sessionVector.size(); iLoop ++)
 				{
-					if (sessionList[iLoop]->getSocketHash() == data.getHash())
+					if (sessionVector[iLoop]->getSocketHash() == data.getHash())
 					{
-						sessionList[iLoop]->do_write(data.getPtr(), data.getLength());
+						sessionVector[iLoop]->do_write(data.getPtr(), data.getLength());
 						break;
 					}
 				}
