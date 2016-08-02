@@ -204,7 +204,14 @@ private:
 		{
 			if (!ec)
 			{
-				ThreadSafeOutput("Accept");
+				boost::asio::ip::address v4address;
+				_pSocketSession->getSocket().remote_endpoint().address(v4address);
+				size_t socketHash = hash_socket(_pSocketSession->getSocket().remote_endpoint().port());
+
+				char charTMP[200];
+				sprintf_s(charTMP, "Accepted, IP:%s, Port:%d", v4address.to_string().c_str(), _pSocketSession->getSocket().remote_endpoint().port());
+				ThreadSafeOutput(std::string(charTMP));
+				
 				_pSocketSession->start();
 				sessionVector.push_back(_pSocketSession);
 			}
