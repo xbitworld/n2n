@@ -27,22 +27,29 @@ namespace dtCSC
 
 	void CSocketClient::Close()
 	{
-		io_service_.post([this]() { socket_.close(); });
+		io_service_.post([this](){ 
+			if (socket_.is_open())
+			{
+				//ThreadSafeOutput("Close");
+				socket_.close();
+			}
+		});
 	}
 
 	void CSocketClient::do_connect(boost::asio::ip::tcp::resolver::iterator endpoint_iterator)
 	{
-		ThreadSafeOutput("Connect\r\n");
+		ThreadSafeOutput("Connecting\r\n");
 		boost::asio::async_connect(socket_, endpoint_iterator,
 		[this](boost::system::error_code ec, boost::asio::ip::tcp::resolver::iterator)
 		{
 			if (!ec)
 			{
+				ThreadSafeOutput("Connected\r\n");
 				do_read();
 			}
 			else
 			{
-				::Sleep(1000);
+				ThreadSafeOutput("Connect failed\r\n");
 				ReConnect();
 			}
 		});
@@ -67,11 +74,6 @@ namespace dtCSC
 			{
 				do_read();
 			}
-			else
-			{
-				::Sleep(1000);
-				ReConnect();
-			}
 		});
 	}
 
@@ -86,13 +88,8 @@ namespace dtCSC
 			{
 				CCharArray dataTemp(serverHash, (const char *)pStr, length);
 				pReadData->put(dataTemp);
+
 				do_read();
-			}
-			else
-			{
-				//::Sleep(1000);
-				//ReConnect();
-				Close();
 			}
 		});
 	}
@@ -111,12 +108,6 @@ namespace dtCSC
 				{
 					do_write();
 				}
-			}
-			else
-			{
-				//::Sleep(1000);
-				//ReConnect();
-				Close();
 			}
 		});
 	}

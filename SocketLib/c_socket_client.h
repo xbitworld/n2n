@@ -19,7 +19,7 @@ namespace dtCSC
 		CSocketClient(size_t Hash,
 		boost::asio::io_service& io_service,
 		boost::asio::ip::tcp::resolver::iterator endpoint_iterator,
-		ClassMutexList<CCharArray> &pBuff, void(*pFun)(const void * pChar))
+		ClassMutexList<CCharArray> &pBuff, void(*pFun)(const std::string &info))
 		: serverHash(Hash)
 		, io_service_(io_service)
 		, socket_(io_service)
@@ -35,7 +35,7 @@ namespace dtCSC
 
 		~CSocketClient()
 		{
-			Close();
+			//Close();
 		}
 
 		void write(const char *pData, int iLen);
@@ -61,7 +61,7 @@ namespace dtCSC
 		ClassMutexList<CCharArray> *pReadData;
 		boost::asio::ip::tcp::resolver::iterator end_iterator;
 
-		void(*ThreadSafeOutput)(const void * pChar);
+		void(*ThreadSafeOutput)(const std::string &info);
 		size_t serverHash;
 	};
 

@@ -92,11 +92,14 @@ public:
 	SocketSession(boost::asio::io_service& io_service)
 		: socket_(io_service)
 	{
+		socket_hash = 0;
 	}
 
 	void start()
 	{
-		Net2SerialBuffer.put(CCharArray(hash_socket(socket_.remote_endpoint().port()), notifyConn.c_str(), notifyConn.length()));
+		socket_hash = hash_socket(socket_.remote_endpoint().port());
+
+		Net2SerialBuffer.put(CCharArray(socket_hash, notifyConn.c_str(), notifyConn.length()));
 		//do_write("Net Start\r\n", 11);
 		do_read();
 	}
@@ -108,7 +111,7 @@ public:
 
 	size_t getSocketHash()
 	{
-		return hash_socket(socket_.remote_endpoint().port());
+		return socket_hash;
 	}
 
 	void Close()
@@ -118,7 +121,7 @@ public:
 		boost::system::error_code ec;
 		boost::asio::ip::address v4address;
 		socket_.remote_endpoint(ec).address(v4address);
-		size_t socketHash = hash_socket(socket_.remote_endpoint().port());
+		socket_hash = hash_socket(socket_.remote_endpoint().port());
 		if (!ec)
 		{
 			sprintf_s(charTMP, "IP:%s, Port:%d", v4address.to_string().c_str(), socket_.remote_endpoint().port());
@@ -132,7 +135,7 @@ public:
 			ThreadSafeOutput(charTMP + ec.message());
 		}
 
-		PushListData(Net2SerialBuffer, CCharArray(socketHash, disconnectFlag.c_str(), (int)disconnectFlag.size()));
+		PushListData(Net2SerialBuffer, CCharArray(socket_hash, disconnectFlag.c_str(), (int)disconnectFlag.size()));
 	}
 
 	void do_write(const char *pData, std::size_t length)
@@ -160,7 +163,7 @@ private:
 		{
 			if (!ec)
 			{
-				Net2SerialBuffer.put(CCharArray(hash_socket(socket_.remote_endpoint().port()), data_, length));
+				Net2SerialBuffer.put(CCharArray(socket_hash, data_, length));
 				do_read();
 			}
 			else if((ec.value() == boost::asio::error::eof) || (ec.value() == boost::asio::error::connection_reset))
@@ -174,10 +177,12 @@ private:
 	}
 
 	tcp::socket socket_;
+	size_t socket_hash;
 	enum { max_length = 4096 };
 	char data_[max_length];
 };
 
+boost::mutex cv_mutex;	//mutex for sessionVector
 std::vector<std::shared_ptr<SocketSession>> sessionVector;
 
 class NetServer
@@ -206,13 +211,15 @@ private:
 			{
 				boost::asio::ip::address v4address;
 				_pSocketSession->getSocket().remote_endpoint().address(v4address);
-				size_t socketHash = hash_socket(_pSocketSession->getSocket().remote_endpoint().port());
 
 				char charTMP[200];
 				sprintf_s(charTMP, "Accepted, IP:%s, Port:%d", v4address.to_string().c_str(), _pSocketSession->getSocket().remote_endpoint().port());
 				ThreadSafeOutput(std::string(charTMP));
 				
 				_pSocketSession->start();
+
+				//Add element in the sessionVector
+				boost::mutex::scoped_lock	lock(cv_mutex);
 				sessionVector.push_back(_pSocketSession);
 			}
 
@@ -262,7 +269,7 @@ int main(int argc, char* argv[])
 		strTMP = std::string("Serial: " + std::string(argv[1]) + ", Address: " + std::string(argv[2]) + ", Port: " + argv[3]);
 		ThreadSafeOutput(strTMP.c_str());
 
-		const boost::shared_ptr<SerialRW> sp(new SerialRW(getSerialData, argv[1], 512000));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
+		const boost::shared_ptr<SerialRW> sp(new SerialRW(getSerialData, argv[1], 115200));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
 
 		std::thread readCOMThread([&sp](){
 			ASIOLib::Executor e;
@@ -276,7 +283,30 @@ int main(int argc, char* argv[])
 		std::thread writeCOMThread([&sp]() {
 			while (true)
 			{
+				//在这里找到需要删除的Session~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!!! 2016-08-03
+
 				CCharArray data = Net2SerialBuffer.get_pop();
+				
+				//Erase the element in the sessionVector
+				if (strncmp(disconnectFlag.c_str(), data.getPtr(), disconnectFlag.size()) == 0)
+				{
+					int iCountTmp = 0;
+
+					boost::mutex::scoped_lock	lock(cv_mutex);
+
+					for each (auto sess in sessionVector)
+					{
+						if (sess->getSocketHash() == data.getHash())
+						{
+							sessionVector.erase(sessionVector.begin() + iCountTmp);
+							char charTMP[200] = { 0 };
+							sprintf_s(charTMP, "Removed Session, Current: %d", sessionVector.size());
+							ThreadSafeOutput(charTMP);
+							break;
+						}
+						iCountTmp++;
+					}
+				}
 
 				sp->Write2Serial(data.getHash(), (unsigned char *)(data.getPtr()), data.getLength());
 
@@ -305,15 +335,25 @@ int main(int argc, char* argv[])
 			{
 				CCharArray data = Serial2NetBuffer.get_pop();
 
-				//May be lost the chance for writing when sessionList be changed in the loop
-				//getCount every time to avoid out of rang
-				for (int iLoop = 0; iLoop < sessionVector.size(); iLoop ++)
+				std::shared_ptr<SocketSession> pTMP = nullptr;
+
 				{
-					if (sessionVector[iLoop]->getSocketHash() == data.getHash())
+					//Lock the sessionVector and get the current SocketSession
+					boost::mutex::scoped_lock	lock(cv_mutex);
+
+					for each (auto sess in sessionVector)
 					{
-						sessionVector[iLoop]->do_write(data.getPtr(), data.getLength());
-						break;
+						if (sess->getSocketHash() == data.getHash())
+						{
+							pTMP = sess;
+							break;
+						}
 					}
+				}
+
+				if (pTMP != nullptr)
+				{
+					pTMP->do_write(data.getPtr(), data.getLength());
 				}
 			}
 		});

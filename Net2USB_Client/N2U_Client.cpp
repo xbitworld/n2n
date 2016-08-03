@@ -26,11 +26,10 @@ using namespace std;
 
 std::string strTMP;
 
+boost::asio::io_service io_service;
 std::string strDestIP, strDestPort;	//The target IP & Port
 
 boost::mutex io_mutex;	//mutex for console display
-ClassMutexList<CCharArray> inBuf;		//Client Send to Server
-ClassMutexList<CCharArray> outBuf;	//Client Read from Server
 
 ClassMutexList<CCharArray> Net2SerialBuffer;		//Buffer for send to serial
 ClassMutexList<CCharArray> Serial2NetBuffer;		//Buffer for send to socket
@@ -43,12 +42,13 @@ class CommPair
 public:
 	CommPair() {}
 
-	boost::thread *pTH;
+	std::shared_ptr<boost::thread> pTH;
 	size_t serverHash;
-	dtCSC::CSocketClient *pClientSocket;
+	std::shared_ptr<dtCSC::CSocketClient> pClientSocket;
 };
 
-std::vector<CommPair> commVector;
+//boost::mutex cv_mutex;	//mutex for commVector
+std::vector<CommPair> commVector;	//Need to lock in multi thread
 //ClassMutexList<std::shared_ptr<dtCSC::CSocketClient>> socketList;
 
 static void ThreadSafeOutput(const std::string &info)
@@ -73,13 +73,6 @@ void DisplayHEX(const char * headString, const char *pData, const int iLength)
 	ThreadSafeOutput(std::string(headString) + std::string(pDataStr));
 }
 
-static void ThreadSafeOutput(const void * pChar)
-{
-	std::string outputString = std::string((const char *)pChar);
-	boost::mutex::scoped_lock	lock(io_mutex);
-	std::cout << outputString << std::endl;
-}
-
 static void InputCMD(void)
 {
 	char line[65535 + 1];
@@ -101,16 +94,16 @@ static void InputCMD(void)
 	}
 }
 
-void newConnect(CommPair &commObj)
+void newConnect(CommPair &commObj, boost::asio::io_service &io_service)
 {
-	boost::asio::io_service io_service;
 	boost::asio::ip::tcp::resolver resolver(io_service);
 	auto endpoint_iterator = resolver.resolve({ strDestIP, strDestPort });
 
-	commObj.pClientSocket = new dtCSC::CSocketClient(commObj.serverHash, io_service, endpoint_iterator, std::ref(Net2SerialBuffer), ThreadSafeOutput);
-	commObj.pTH = new boost::thread([&io_service]() { io_service.run(); });
+	commObj.pClientSocket = std::make_shared<dtCSC::CSocketClient>(commObj.serverHash, io_service, endpoint_iterator, std::ref(Net2SerialBuffer), ThreadSafeOutput);
+	commObj.pTH = std::make_shared<boost::thread>([&io_service]() { io_service.run(); });
 
 	//commObj.pTH->join();
+	//ThreadSafeOutput("End Thread");
 }
 
 static void writeNetData(ClassMutexList<CCharArray> &dataList)
@@ -119,7 +112,9 @@ static void writeNetData(ClassMutexList<CCharArray> &dataList)
 	{
 		CCharArray tempData = dataList.get_pop();
 
-		for each (auto commTMP in ((std::vector<CommPair>)(commVector)))
+		//boost::mutex::scoped_lock	lock(cv_mutex);
+
+		for each (auto commTMP in commVector)
 		{
 			if (commTMP.serverHash == tempData.getHash())
 			{
@@ -141,11 +136,12 @@ static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialDa
 
 		CommPair commObj;
 		commObj.serverHash = Hash;
-		newConnect(commObj);
+		newConnect(commObj, io_service);
 
-		//std::thread(bind(newConnect, _1, commObj));
+		//std::thread(bind(newConnect, commObj));
 
-		((std::vector<CommPair>)(commVector)).push_back(commObj);
+		//boost::mutex::scoped_lock	lock(cv_mutex);
+		commVector.push_back(commObj);
 
 		iEvent = 1;
 	}
@@ -153,24 +149,26 @@ static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialDa
 	{
 		ThreadSafeOutput("to Disconnect");
 
+		iEvent = 2;
+
 		int iCount = 0;
-		for each (auto commTMP in ((std::vector<CommPair>)(commVector)))
+
+		//boost::mutex::scoped_lock	lock(cv_mutex);
+
+		for each (auto commTMP in commVector)
 		{
 			if (commTMP.serverHash == Hash)
 			{
+				commTMP.pClientSocket.reset();
 				commTMP.pTH->interrupt();
-				commTMP.pClientSocket->Close();
+				commTMP.pTH.reset();
 
-				delete commTMP.pTH;
-				delete commTMP.pClientSocket;
-
-				((std::vector<CommPair>)(commVector)).erase(((std::vector<CommPair>)(commVector)).begin() + iCount);
-				iEvent = 2;
+				commVector.erase(commVector.begin() + iCount);
+				iEvent = 3;
+				break;
 			}
 			iCount++;
 		}
-
-		iEvent = 3;
 	}
 	//DisplayHEX((const char *)("Serial: "), tmp.getPtr(), iLen);
 	std::string lstrTMP;
@@ -184,7 +182,7 @@ static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialDa
 	if (iEvent != 0)
 	{
 		char strEvent[100];
-		sprintf_s(strEvent, "Event: %d", iEvent);
+		sprintf_s(strEvent, "Event: %d, Current: %d", iEvent, commVector.size());
 		lstrTMP = std::string(mbstr)+ std::string(strEvent);
 	}
 	else
@@ -195,7 +193,7 @@ static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialDa
 		char strLen[100] = { 0 };
 		::_itoa_s(tmp.getLength(), strLen, 10);
 
-		lstrTMP = std::string(mbstr) + std::string(strLen);
+		lstrTMP = std::string(mbstr) + "R: " + std::string(strLen);
 	}
 
 	ThreadSafeOutput(lstrTMP);
@@ -219,7 +217,7 @@ int main(int argc, char* argv[])
 		strTMP = std::string("Serial: " + std::string(argv[1]) + ", Address: " + strDestIP + ", Port: " + strDestPort);
 		ThreadSafeOutput(strTMP.c_str());
 
-		const boost::shared_ptr<SerialRW> sp(new SerialRW(getSerialData, argv[1], 512000));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
+		const boost::shared_ptr<SerialRW> sp(new SerialRW(getSerialData, argv[1], 115200));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
 
 		std::thread readCOMThread([&sp]() {
 			ASIOLib::Executor e;
