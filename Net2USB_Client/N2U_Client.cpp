@@ -25,8 +25,6 @@ using boost::asio::ip::tcp;
 using namespace std;
 
 std::string strTMP;
-
-boost::asio::io_service io_service;
 std::string strDestIP, strDestPort;	//The target IP & Port
 
 boost::mutex io_mutex;	//mutex for console display
@@ -37,6 +35,9 @@ ClassMutexList<CCharArray> Serial2NetBuffer;		//Buffer for send to socket
 std::string connectFlag("&*CONN*&");
 std::string disconnectFlag("*&DISC&*");
 
+std::vector<std::size_t> AddHash;
+std::vector<std::size_t> RmvHash;
+
 class CommPair
 {
 public:
@@ -44,7 +45,7 @@ public:
 
 	std::shared_ptr<std::thread> pTH;
 	size_t serverHash;
-	std::shared_ptr<dtCSC::CSocketClient> pClientSocket;
+	dtCSC::CSocketClient* pClientSocket;
 };
 
 boost::mutex cv_mutex;	//mutex for commVector
@@ -94,22 +95,6 @@ static void InputCMD(void)
 	}
 }
 
-void newConnect(CommPair &commObj, boost::asio::io_service &io_service, std::shared_ptr<std::thread> pth)
-{
-	boost::asio::ip::tcp::resolver resolver(io_service);
-	auto endpoint_iterator = resolver.resolve({ strDestIP, strDestPort });
-
-	commObj.pClientSocket = std::make_shared<dtCSC::CSocketClient>(commObj.serverHash, io_service, endpoint_iterator, std::ref(Net2SerialBuffer), ThreadSafeOutput);
-
-	if (pth == nullptr)
-	{//Only run when there have not the pTH, make sure there only one instance
-		commObj.pTH = std::make_shared<std::thread>([&io_service]() { io_service.run(); });
-	}
-
-	//commObj.pTH->join();
-	//ThreadSafeOutput("End Thread");
-}
-
 static void writeNetData(ClassMutexList<CCharArray> &dataList)
 {
 	while (true)
@@ -137,6 +122,81 @@ static void writeNetData(ClassMutexList<CCharArray> &dataList)
 	}
 }
 
+void socketConnect()
+{
+	boost::asio::io_service io_service;
+
+	while (true)
+	{
+		size_t addHash = 0;
+		size_t rmvHash = 0;
+
+		if (!AddHash.empty())
+		{
+			addHash = AddHash.front();
+			AddHash.erase(AddHash.begin());
+		}
+
+		if(addHash != 0)
+		{//Add thread
+			boost::asio::ip::tcp::resolver resolver(io_service);
+			auto endpoint_iterator = resolver.resolve({ strDestIP, strDestPort });
+
+			CommPair commObj;
+			commObj.serverHash = addHash;
+
+			commObj.pClientSocket = new dtCSC::CSocketClient(commObj.serverHash, io_service, endpoint_iterator, std::ref(Net2SerialBuffer), ThreadSafeOutput);
+
+			boost::mutex::scoped_lock	lock(cv_mutex);
+			if (commVector.size() > 0)
+			{
+				commObj.pTH = commVector[0].pTH;
+			}
+			else
+			{
+				commObj.pTH = std::make_shared<std::thread>(std::thread([&io_service]() { io_service.run(); }));
+			}
+			commVector.push_back(commObj);
+		}
+
+		if (!RmvHash.empty())
+		{
+			rmvHash = RmvHash.front();
+			RmvHash.erase(RmvHash.begin());
+		}
+		if(rmvHash != 0)
+		{//Remove thread
+			int iCount = 0;
+			bool bFind = false;
+			CommPair commObj;
+
+			{//Avoid lock commVector too long
+				boost::mutex::scoped_lock	lock(cv_mutex);
+				for each (auto tmpObj in commVector)
+				{
+					if (tmpObj.serverHash == rmvHash)
+					{
+						commObj = tmpObj;
+						bFind = true;
+						break;
+					}
+					iCount++;
+				}
+			}
+
+			if (bFind)
+			{
+				commObj.pClientSocket->Close();
+				commObj.pTH->join();
+				commObj.pTH.reset();
+				delete commObj.pClientSocket;
+
+				commVector.erase(commVector.begin() + iCount);
+			}
+		}
+	}
+}
+
 //Get data from Serial Port, then the function be calledback
 static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialData, int iLen)
 {
@@ -147,19 +207,7 @@ static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialDa
 	{
 		ThreadSafeOutput("to Connect");
 
-		CommPair commObj;
-
-		std::shared_ptr<std::thread> pTH = nullptr;
-		if (commVector.size() > 0)
-		{
-			pTH = commVector[0].pTH;
-		}
-
-		commObj.serverHash = Hash;
-		newConnect(commObj, io_service, pTH);
-
-		boost::mutex::scoped_lock	lock(cv_mutex);
-		commVector.push_back(commObj);
+		AddHash.push_back(Hash);
 
 		iEvent = 1;
 	}
@@ -167,26 +215,10 @@ static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialDa
 	{
 		ThreadSafeOutput("to Disconnect");
 
+		RmvHash.push_back(Hash);
+
 		iEvent = 2;
 
-		int iCount = 0;
-
-		boost::mutex::scoped_lock	lock(cv_mutex);
-
-		for each (auto commTMP in commVector)
-		{
-			if (commTMP.serverHash == Hash)
-			{
-				commTMP.pClientSocket->Close();
-				commTMP.pTH.reset();
-				commTMP.pClientSocket.reset();
-
-				commVector.erase(commVector.begin() + iCount);
-				iEvent = 3;
-				break;
-			}
-			iCount++;
-		}
 	}
 	//DisplayHEX((const char *)("Serial: "), tmp.getPtr(), iLen);
 	std::string lstrTMP;
@@ -268,13 +300,14 @@ int main(int argc, char* argv[])
 		});
 		
 		std::thread writeNetThread(writeNetData, std::ref(Serial2NetBuffer));
+		std::thread socketMannager(socketConnect);
 
 		std::thread InputCMDThread(InputCMD);
 
 		readCOMThread.join();
 		writeCOMThread.join();
 		writeNetThread.join();
-
+		socketMannager.join();
 		InputCMDThread.join();
 	}
 	catch (std::exception& e)
