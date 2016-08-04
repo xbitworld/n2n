@@ -294,13 +294,14 @@ int main(int argc, char* argv[])
 
 					boost::mutex::scoped_lock	lock(cv_mutex);
 
+					ThreadSafeOutput("Removed Session");
 					for each (auto sess in sessionVector)
 					{
 						if (sess->getSocketHash() == data.getHash())
 						{
 							sessionVector.erase(sessionVector.begin() + iCountTmp);
 							char charTMP[200] = { 0 };
-							sprintf_s(charTMP, "Removed Session, Current: %d", sessionVector.size());
+							sprintf_s(charTMP, "Hash: %020lld, Current: %zd", sess->getSocketHash(), sessionVector.size());
 							ThreadSafeOutput(charTMP);
 							break;
 						}
@@ -338,6 +339,7 @@ int main(int argc, char* argv[])
 				std::shared_ptr<SocketSession> pTMP = nullptr;
 
 				{
+					bool bFind = false;
 					//Lock the sessionVector and get the current SocketSession
 					boost::mutex::scoped_lock	lock(cv_mutex);
 
@@ -346,8 +348,14 @@ int main(int argc, char* argv[])
 						if (sess->getSocketHash() == data.getHash())
 						{
 							pTMP = sess;
+							bFind = true;
 							break;
 						}
+					}
+
+					if (!bFind)
+					{
+						ThreadSafeOutput("Didn't find Session in Vector");
 					}
 				}
 

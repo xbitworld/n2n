@@ -42,12 +42,12 @@ class CommPair
 public:
 	CommPair() {}
 
-	std::shared_ptr<boost::thread> pTH;
+	std::shared_ptr<std::thread> pTH;
 	size_t serverHash;
 	std::shared_ptr<dtCSC::CSocketClient> pClientSocket;
 };
 
-//boost::mutex cv_mutex;	//mutex for commVector
+boost::mutex cv_mutex;	//mutex for commVector
 std::vector<CommPair> commVector;	//Need to lock in multi thread
 //ClassMutexList<std::shared_ptr<dtCSC::CSocketClient>> socketList;
 
@@ -94,13 +94,17 @@ static void InputCMD(void)
 	}
 }
 
-void newConnect(CommPair &commObj, boost::asio::io_service &io_service)
+void newConnect(CommPair &commObj, boost::asio::io_service &io_service, std::shared_ptr<std::thread> pth)
 {
 	boost::asio::ip::tcp::resolver resolver(io_service);
 	auto endpoint_iterator = resolver.resolve({ strDestIP, strDestPort });
 
 	commObj.pClientSocket = std::make_shared<dtCSC::CSocketClient>(commObj.serverHash, io_service, endpoint_iterator, std::ref(Net2SerialBuffer), ThreadSafeOutput);
-	commObj.pTH = std::make_shared<boost::thread>([&io_service]() { io_service.run(); });
+
+	if (pth == nullptr)
+	{//Only run when there have not the pTH, make sure there only one instance
+		commObj.pTH = std::make_shared<std::thread>([&io_service]() { io_service.run(); });
+	}
 
 	//commObj.pTH->join();
 	//ThreadSafeOutput("End Thread");
@@ -112,14 +116,23 @@ static void writeNetData(ClassMutexList<CCharArray> &dataList)
 	{
 		CCharArray tempData = dataList.get_pop();
 
-		//boost::mutex::scoped_lock	lock(cv_mutex);
+		boost::mutex::scoped_lock	lock(cv_mutex);
+
+		bool bFind = false;
 
 		for each (auto commTMP in commVector)
 		{
 			if (commTMP.serverHash == tempData.getHash())
 			{
 				commTMP.pClientSocket->write(tempData.getPtr(), tempData.getLength());
+				bFind = true;
+				break;
 			}
+		}
+
+		if (!bFind)
+		{
+			ThreadSafeOutput("Didn't find CommObj");
 		}
 	}
 }
@@ -135,12 +148,17 @@ static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialDa
 		ThreadSafeOutput("to Connect");
 
 		CommPair commObj;
+
+		std::shared_ptr<std::thread> pTH = nullptr;
+		if (commVector.size() > 0)
+		{
+			pTH = commVector[0].pTH;
+		}
+
 		commObj.serverHash = Hash;
-		newConnect(commObj, io_service);
+		newConnect(commObj, io_service, pTH);
 
-		//std::thread(bind(newConnect, commObj));
-
-		//boost::mutex::scoped_lock	lock(cv_mutex);
+		boost::mutex::scoped_lock	lock(cv_mutex);
 		commVector.push_back(commObj);
 
 		iEvent = 1;
@@ -153,15 +171,15 @@ static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialDa
 
 		int iCount = 0;
 
-		//boost::mutex::scoped_lock	lock(cv_mutex);
+		boost::mutex::scoped_lock	lock(cv_mutex);
 
 		for each (auto commTMP in commVector)
 		{
 			if (commTMP.serverHash == Hash)
 			{
-				commTMP.pClientSocket.reset();
-				commTMP.pTH->interrupt();
+				commTMP.pClientSocket->Close();
 				commTMP.pTH.reset();
+				commTMP.pClientSocket.reset();
 
 				commVector.erase(commVector.begin() + iCount);
 				iEvent = 3;
@@ -177,13 +195,13 @@ static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialDa
 	struct tm now;
 	char mbstr[100];
 	::localtime_s(&now, &t);
-	std::strftime(mbstr, sizeof(mbstr), "%T ", &now);
+	std::strftime(mbstr, sizeof(mbstr), "%T", &now);
 
 	if (iEvent != 0)
 	{
 		char strEvent[100];
-		sprintf_s(strEvent, "Event: %d, Current: %d", iEvent, commVector.size());
-		lstrTMP = std::string(mbstr)+ std::string(strEvent);
+		sprintf_s(strEvent, "%s, Event: %d, Current: %zd", mbstr, iEvent, commVector.size());
+		lstrTMP = std::string(strEvent);
 	}
 	else
 	{
