@@ -134,7 +134,7 @@ static void writeNetData(ClassMutexList<CCharArray> &dataList)
 void socketConnect()
 {//Need to modify, dutao@2016-08-05
 	boost::asio::io_service io_service;
-	//boost::asio::io_service::work worker(io_service);
+	boost::asio::io_service::work worker(io_service);
 
 	while (true)
 	{
@@ -160,8 +160,8 @@ void socketConnect()
 				if (io_service.stopped())
 				{
 					ThreadSafeOutput("Reset io_service");
-					io_service.reset();
 				}
+				io_service.reset();
 			}
 			else
 			{
@@ -195,7 +195,7 @@ void socketConnect()
 
 			if (bFind)
 			{
-				commObj.pClientSocket->Close();
+				//commObj.pClientSocket->Close();
 				io_service.stop();
 				commObj.pTH->join();
 				delete commObj.pClientSocket;
@@ -205,7 +205,7 @@ void socketConnect()
 
 				char strEvent[100];
 				sprintf_s(strEvent, "Current: %zd", commVector.size());
-				ThreadSafeOutput("Erase commVector" + std::string(strEvent));
+				ThreadSafeOutput("Erase commVector, " + std::string(strEvent));
 			}
 		}
 	}

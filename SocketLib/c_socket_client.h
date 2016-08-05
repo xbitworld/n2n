@@ -22,10 +22,10 @@ namespace dtCSC
 		ClassMutexList<CCharArray> &pBuff, void(*pFun)(const std::string &info))
 		: serverHash(Hash)
 		, io_service_(io_service)
-		, socket_(io_service)
 		, end_iterator(endpoint_iterator)
 		, ThreadSafeOutput(pFun)
 		{
+			socket_ = std::make_shared<boost::asio::ip::tcp::socket>(io_service_);
 			pReadData = &pBuff;
 			end_iterator = end_iterator;
 			do_connect(end_iterator);
@@ -35,7 +35,7 @@ namespace dtCSC
 
 		~CSocketClient()
 		{
-			//Close();
+			Close();
 		}
 
 		void write(const char *pData, int iLen);
@@ -55,7 +55,7 @@ namespace dtCSC
 
 	private:
 		boost::asio::io_service& io_service_;
-		boost::asio::ip::tcp::socket socket_;
+		std::shared_ptr<boost::asio::ip::tcp::socket> socket_;
 		char xReadData[max_length];
 		MessageQueue write_msgs_;
 		ClassMutexList<CCharArray> *pReadData;

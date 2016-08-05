@@ -34,18 +34,21 @@ namespace dtCSC
 	{
 		if (io_service_.stopped())
 		{
+			printf_s("IO Stoped\n");
+			socket_->close();
 			return;
 		}
 
 		io_service_.post([this](){
-			socket_.close();
+			//socket_.cancel();
+			socket_->close();
 		});
 	}
 
 	void CSocketClient::do_connect(boost::asio::ip::tcp::resolver::iterator endpoint_iterator)
 	{
 		ThreadSafeOutput("Connecting\r\n");
-		boost::asio::async_connect(socket_, endpoint_iterator,
+		boost::asio::async_connect(*socket_, endpoint_iterator,
 		[this](boost::system::error_code ec, boost::asio::ip::tcp::resolver::iterator)
 		{
 			if (!ec)
@@ -55,7 +58,7 @@ namespace dtCSC
 			}
 			else
 			{
-				ThreadSafeOutput("Connect failed\r\n");
+				ThreadSafeOutput("Connect failed " + ec.message());
 				ReConnect();
 			}
 		});
@@ -63,17 +66,19 @@ namespace dtCSC
 
 	bool CSocketClient::isSocketOpen()
 	{
-		return socket_.is_open();
+		return socket_->is_open();
 	}
 
 	void CSocketClient::ReConnect()
 	{
 		ThreadSafeOutput("Reconnect");
 		
-		if(socket_.is_open())
-			Close();
+		if (socket_->is_open())
+		{
+			socket_->close();
+		}
 			
-		boost::asio::async_connect(socket_, end_iterator,
+		boost::asio::async_connect(*socket_, end_iterator,
 		[this](boost::system::error_code ec, boost::asio::ip::tcp::resolver::iterator)
 		{
 			if (!ec)
@@ -87,9 +92,11 @@ namespace dtCSC
 	{
 		char *pStr = xReadData;
 		std::memset(pStr, 0, max_length);
-		socket_.async_read_some(boost::asio::buffer(pStr, max_length),
+		socket_->async_read_some(boost::asio::buffer(pStr, max_length),
 			[this, pStr](boost::system::error_code ec, std::size_t length)
 		{
+			printf_s("Socket: %0X\n", this);
+
 			if (!ec)
 			{
 				CCharArray dataTemp(serverHash, (const char *)pStr, length);
@@ -97,16 +104,16 @@ namespace dtCSC
 
 				do_read();
 			}
-			//else
-			//{
-			//	ThreadSafeOutput("Read Exception: " + ec.message());
-			//}
+			else
+			{
+				printf_s("Read Exception: %s\n", ec.message().c_str());
+			}
 		});
 	}
 
 	void CSocketClient::do_write()
 	{
-		boost::asio::async_write(socket_,
+		boost::asio::async_write(*socket_,
 		boost::asio::buffer(write_msgs_.front().data(),
 		write_msgs_.front().size()),
 		[this](boost::system::error_code ec, std::size_t )
