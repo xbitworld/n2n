@@ -35,9 +35,6 @@ ClassMutexList<CCharArray> Serial2NetBuffer;		//Buffer for send to socket
 std::string connectFlag("&*CONN*&");
 std::string disconnectFlag("*&DISC&*");
 
-std::vector<std::size_t> AddHash;
-std::vector<std::size_t> RmvHash;
-
 class CommPair
 {
 public:
@@ -47,6 +44,18 @@ public:
 	size_t serverHash;
 	dtCSC::CSocketClient* pClientSocket;
 };
+
+class CHashMark
+{
+public:
+	CHashMark() {}
+	CHashMark(size_t h, bool ar) :hash(h), add_rmv(ar) {}
+
+	size_t hash;
+	bool add_rmv;	//true for add, otherwise remove
+};
+
+ClassMutexList<CHashMark> HashList;
 
 boost::mutex cv_mutex;	//mutex for commVector
 std::vector<CommPair> commVector;	//Need to lock in multi thread
@@ -123,27 +132,24 @@ static void writeNetData(ClassMutexList<CCharArray> &dataList)
 }
 
 void socketConnect()
-{
+{//Need to modify, dutao@2016-08-05
 	boost::asio::io_service io_service;
+	//boost::asio::io_service::work worker(io_service);
 
 	while (true)
 	{
 		size_t addHash = 0;
 		size_t rmvHash = 0;
 
-		if (!AddHash.empty())
-		{
-			addHash = AddHash.front();
-			AddHash.erase(AddHash.begin());
-		}
+		CHashMark hashObj = HashList.get_pop();
 
-		if(addHash != 0)
+		if(hashObj.add_rmv)
 		{//Add thread
 			boost::asio::ip::tcp::resolver resolver(io_service);
 			auto endpoint_iterator = resolver.resolve({ strDestIP, strDestPort });
 
 			CommPair commObj;
-			commObj.serverHash = addHash;
+			commObj.serverHash = hashObj.hash;
 
 			commObj.pClientSocket = new dtCSC::CSocketClient(commObj.serverHash, io_service, endpoint_iterator, std::ref(Net2SerialBuffer), ThreadSafeOutput);
 
@@ -151,20 +157,23 @@ void socketConnect()
 			if (commVector.size() > 0)
 			{
 				commObj.pTH = commVector[0].pTH;
+				if (io_service.stopped())
+				{
+					ThreadSafeOutput("Reset io_service");
+					io_service.reset();
+				}
 			}
 			else
 			{
 				commObj.pTH = std::make_shared<std::thread>(std::thread([&io_service]() { io_service.run(); }));
 			}
 			commVector.push_back(commObj);
-		}
 
-		if (!RmvHash.empty())
-		{
-			rmvHash = RmvHash.front();
-			RmvHash.erase(RmvHash.begin());
+			char strEvent[100];
+			sprintf_s(strEvent, "Current: %zd", commVector.size());
+			ThreadSafeOutput("Add commVector" + std::string(strEvent));
 		}
-		if(rmvHash != 0)
+		else
 		{//Remove thread
 			int iCount = 0;
 			bool bFind = false;
@@ -174,7 +183,7 @@ void socketConnect()
 				boost::mutex::scoped_lock	lock(cv_mutex);
 				for each (auto tmpObj in commVector)
 				{
-					if (tmpObj.serverHash == rmvHash)
+					if (tmpObj.serverHash == hashObj.hash)
 					{
 						commObj = tmpObj;
 						bFind = true;
@@ -187,11 +196,16 @@ void socketConnect()
 			if (bFind)
 			{
 				commObj.pClientSocket->Close();
+				io_service.stop();
 				commObj.pTH->join();
-				commObj.pTH.reset();
 				delete commObj.pClientSocket;
+				commObj.pTH.reset();
 
 				commVector.erase(commVector.begin() + iCount);
+
+				char strEvent[100];
+				sprintf_s(strEvent, "Current: %zd", commVector.size());
+				ThreadSafeOutput("Erase commVector" + std::string(strEvent));
 			}
 		}
 	}
@@ -207,7 +221,8 @@ static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialDa
 	{
 		ThreadSafeOutput("to Connect");
 
-		AddHash.push_back(Hash);
+		CHashMark hashObj(Hash, true);
+		HashList.put(hashObj);
 
 		iEvent = 1;
 	}
@@ -215,7 +230,8 @@ static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialDa
 	{
 		ThreadSafeOutput("to Disconnect");
 
-		RmvHash.push_back(Hash);
+		CHashMark hashObj(Hash, false);
+		HashList.put(hashObj);
 
 		iEvent = 2;
 
@@ -243,7 +259,7 @@ static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialDa
 		char strLen[100] = { 0 };
 		::_itoa_s(tmp.getLength(), strLen, 10);
 
-		lstrTMP = std::string(mbstr) + "R: " + std::string(strLen);
+		lstrTMP = std::string(mbstr) + " R: " + std::string(strLen);
 	}
 
 	ThreadSafeOutput(lstrTMP);

@@ -12,6 +12,11 @@ namespace dtCSC
 			tmpV.push_back(*(pData + i));
 		}
 
+		if (io_service_.stopped())
+		{
+			return;
+		}
+
 		io_service_.post(
 			[this, tmpV]()
 		{
@@ -27,17 +32,13 @@ namespace dtCSC
 
 	void CSocketClient::Close()
 	{
+		if (io_service_.stopped())
+		{
+			return;
+		}
+
 		io_service_.post([this](){
-			boost::system::error_code ec;
-			socket_.close(ec);
-			if (!ec)
-			{
-				ThreadSafeOutput("Closed");
-			}
-			else
-			{
-				ThreadSafeOutput("Close Exception: " + ec.message());
-			}
+			socket_.close();
 		});
 	}
 
@@ -96,10 +97,10 @@ namespace dtCSC
 
 				do_read();
 			}
-			else
-			{
-				ThreadSafeOutput("Read Exception: " + ec.message());
-			}
+			//else
+			//{
+			//	ThreadSafeOutput("Read Exception: " + ec.message());
+			//}
 		});
 	}
 
@@ -118,10 +119,10 @@ namespace dtCSC
 					do_write();
 				}
 			}
-			else
-			{
-				ThreadSafeOutput("Write Exception: " + ec.message());
-			}
+			//else
+			//{
+			//	ThreadSafeOutput("Write Exception: " + ec.message());
+			//}
 		});
 	}
 
