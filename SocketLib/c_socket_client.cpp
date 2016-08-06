@@ -32,15 +32,7 @@ namespace dtCSC
 
 	void CSocketClient::Close()
 	{
-		if (io_service_.stopped())
-		{
-			printf_s("IO Stoped\n");
-			socket_->close();
-			return;
-		}
-
 		io_service_.post([this](){
-			//socket_.cancel();
 			socket_->close();
 		});
 	}
@@ -95,7 +87,7 @@ namespace dtCSC
 		socket_->async_read_some(boost::asio::buffer(pStr, max_length),
 			[this, pStr](boost::system::error_code ec, std::size_t length)
 		{
-			printf_s("Socket: %0X\n", this);
+			//printf_s("Socket: %0X\n", this);
 
 			if (!ec)
 			{

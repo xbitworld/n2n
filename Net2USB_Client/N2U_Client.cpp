@@ -24,16 +24,12 @@
 using boost::asio::ip::tcp;
 using namespace std;
 
-std::string strTMP;
 std::string strDestIP, strDestPort;	//The target IP & Port
 
 boost::mutex io_mutex;	//mutex for console display
 
 ClassMutexList<CCharArray> Net2SerialBuffer;		//Buffer for send to serial
 ClassMutexList<CCharArray> Serial2NetBuffer;		//Buffer for send to socket
-
-std::string connectFlag("&*CONN*&");
-std::string disconnectFlag("*&DISC&*");
 
 class CommPair
 {
@@ -104,6 +100,7 @@ static void InputCMD(void)
 	}
 }
 
+//Prepare to put this function to socketConnect 2016-08-05
 static void writeNetData(ClassMutexList<CCharArray> &dataList)
 {
 	while (true)
@@ -135,6 +132,20 @@ void socketConnect()
 {//Need to modify, dutao@2016-08-05
 	boost::asio::io_service io_service;
 	boost::asio::io_service::work worker(io_service);
+	std::thread IOService = std::thread([&io_service]() {
+		for (;;)
+		{
+			try
+			{
+				io_service.run();
+				break; // run() exited normally
+			}
+			catch (boost::system::error_code &ec)
+			{
+				// Deal with exception as appropriate.
+			}
+		}
+	});
 
 	while (true)
 	{
@@ -152,21 +163,9 @@ void socketConnect()
 			commObj.serverHash = hashObj.hash;
 
 			commObj.pClientSocket = new dtCSC::CSocketClient(commObj.serverHash, io_service, endpoint_iterator, std::ref(Net2SerialBuffer), ThreadSafeOutput);
+			io_service.reset();
 
 			boost::mutex::scoped_lock	lock(cv_mutex);
-			if (commVector.size() > 0)
-			{
-				commObj.pTH = commVector[0].pTH;
-				if (io_service.stopped())
-				{
-					ThreadSafeOutput("Reset io_service");
-				}
-				io_service.reset();
-			}
-			else
-			{
-				commObj.pTH = std::make_shared<std::thread>(std::thread([&io_service]() { io_service.run(); }));
-			}
 			commVector.push_back(commObj);
 
 			char strEvent[100];
@@ -195,11 +194,7 @@ void socketConnect()
 
 			if (bFind)
 			{
-				//commObj.pClientSocket->Close();
-				io_service.stop();
-				commObj.pTH->join();
 				delete commObj.pClientSocket;
-				commObj.pTH.reset();
 
 				commVector.erase(commVector.begin() + iCount);
 
@@ -215,6 +210,10 @@ void socketConnect()
 static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialData, int iLen)
 {
 	int iEvent = 0;
+
+	std::string connectFlag("&*CONN*&");
+	std::string disconnectFlag("*&DISC&*");
+
 	CCharArray tmp = CCharArray(Hash, SerialData, iLen);
 
 	if(strncmp(connectFlag.c_str(), tmp.getPtr(), connectFlag.size()) == 0)
@@ -280,7 +279,7 @@ int main(int argc, char* argv[])
 		strDestIP = argv[2];
 		strDestPort = argv[3];
 
-		strTMP = std::string("Serial: " + std::string(argv[1]) + ", Address: " + strDestIP + ", Port: " + strDestPort);
+		std::string strTMP = std::string("Serial: " + std::string(argv[1]) + ", Address: " + strDestIP + ", Port: " + strDestPort);
 		ThreadSafeOutput(strTMP.c_str());
 
 		const boost::shared_ptr<SerialRW> sp(new SerialRW(getSerialData, argv[1], 115200));  // for shared_from_this() to work inside of Reader, Reader must already be managed by a smart pointer
@@ -310,8 +309,8 @@ int main(int argc, char* argv[])
 				char strLen[20] = { 0 };
 				::_itoa_s(data.getLength(), strLen, 10);
 
-				strTMP = std::string(mbstr) + std::string(strLen);
-				ThreadSafeOutput(strTMP.c_str());
+				std::string strLog = std::string(mbstr) + std::string(strLen);
+				ThreadSafeOutput(strLog.c_str());
 			}
 		});
 		
@@ -328,7 +327,7 @@ int main(int argc, char* argv[])
 	}
 	catch (std::exception& e)
 	{
-		strTMP = std::string("Exception: " + std::string(e.what()));
+		std::string strTMP = std::string("Exception: " + std::string(e.what()));
 		ThreadSafeOutput(strTMP.c_str());
 	}
 

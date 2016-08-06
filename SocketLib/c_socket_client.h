@@ -35,7 +35,7 @@ namespace dtCSC
 
 		~CSocketClient()
 		{
-			Close();
+			//Close();
 		}
 
 		void write(const char *pData, int iLen);

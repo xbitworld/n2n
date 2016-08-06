@@ -300,9 +300,9 @@ int main(int argc, char* argv[])
 						if (sess->getSocketHash() == data.getHash())
 						{
 							sessionVector.erase(sessionVector.begin() + iCountTmp);
-							char charTMP[200] = { 0 };
-							sprintf_s(charTMP, "Hash: %020lld, Current: %zd", sess->getSocketHash(), sessionVector.size());
-							ThreadSafeOutput(charTMP);
+							//char charTMP[200] = { 0 };
+							//sprintf_s(charTMP, "Hash: %020lld, Current: %zd", sess->getSocketHash(), sessionVector.size());
+							//ThreadSafeOutput(charTMP);
 							break;
 						}
 						iCountTmp++;
