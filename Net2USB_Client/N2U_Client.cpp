@@ -140,7 +140,7 @@ void socketConnect()
 				io_service.run();
 				break; // run() exited normally
 			}
-			catch (boost::system::error_code &ec)
+			catch (...)
 			{
 				// Deal with exception as appropriate.
 			}
