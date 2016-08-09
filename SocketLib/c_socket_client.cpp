@@ -98,7 +98,7 @@ namespace dtCSC
 			}
 			else
 			{
-				printf_s("Read Exception: %s\n", ec.message().c_str());
+				printf("Read Exception: %s\n", ec.message().c_str());
 			}
 		});
 	}

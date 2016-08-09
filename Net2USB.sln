@@ -7,6 +7,19 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Net2USB_Server", "Net2USB_S
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Net2USB_Client", "Net2USB_Client\Net2USB_Client.vcxproj", "{E2F6E92E-50B2-4C2D-B8E9-95859D23FA41}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "CodeLite", "CodeLite", "{86D5B851-E03D-4B7B-99FA-3890B4289C6D}"
+	ProjectSection(SolutionItems) = preProject
+		Codelite\makefile.client = Codelite\makefile.client
+		Codelite\makefile.server = Codelite\makefile.server
+		Codelite\Net2USB.workspace = Codelite\Net2USB.workspace
+		Codelite\Net2USB_Client.mk = Codelite\Net2USB_Client.mk
+		Codelite\Net2USB_Client.project = Codelite\Net2USB_Client.project
+		Codelite\Net2USB_Client.txt = Codelite\Net2USB_Client.txt
+		Codelite\Net2USB_Server.mk = Codelite\Net2USB_Server.mk
+		Codelite\Net2USB_Server.project = Codelite\Net2USB_Server.project
+		Codelite\Net2USB_Server.txt = Codelite\Net2USB_Server.txt
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeLite_Workspace Name="Net2USB" Database="">
+  <Project Name="Net2USB_Server" Path="Net2USB_Server.project" Active="Yes"/>
+  <Project Name="Net2USB_Client" Path="Net2USB_Client.project" Active="No"/>
+  <BuildMatrix>
+    <WorkspaceConfiguration Name="Debug" Selected="yes">
+      <Environment/>
+      <Project Name="Net2USB_Server" ConfigName="Debug"/>
+      <Project Name="Net2USB_Client" ConfigName="Debug"/>
+    </WorkspaceConfiguration>
+    <WorkspaceConfiguration Name="Release" Selected="yes">
+      <Environment/>
+      <Project Name="Net2USB_Server" ConfigName="Release"/>
+      <Project Name="Net2USB_Client" ConfigName="Release"/>
+    </WorkspaceConfiguration>
+  </BuildMatrix>
+</CodeLite_Workspace>

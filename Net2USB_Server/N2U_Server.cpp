@@ -124,14 +124,14 @@ public:
 		socket_hash = hash_socket(socket_.remote_endpoint().port());
 		if (!ec)
 		{
-			sprintf_s(charTMP, "IP:%s, Port:%d", v4address.to_string().c_str(), socket_.remote_endpoint().port());
+			sprintf(charTMP, "IP:%s, Port:%d", v4address.to_string().c_str(), socket_.remote_endpoint().port());
 			socket_.cancel();
 			socket_.close();
 			ThreadSafeOutput(std::string(charTMP) + std::string(", Disconnected"));
 		}
 		else
 		{
-			sprintf_s(charTMP, "Close Error, Code: %d, Message: ", ec.value());
+			sprintf(charTMP, "Close Error, Code: %d, Message: ", ec.value());
 			ThreadSafeOutput(charTMP + ec.message());
 		}
 
@@ -147,7 +147,7 @@ public:
 			if ((ec.value() == boost::asio::error::eof) || (ec.value() == boost::asio::error::connection_reset))
 			{
 				char strVal[200] = { 0 };
-				sprintf_s(strVal, "Write Error, Code: %d, Message: ", ec.value());
+				sprintf(strVal, "Write Error, Code: %d, Message: ", ec.value());
 				ThreadSafeOutput(strVal + ec.message());
 				self->Close();
 			}
@@ -169,7 +169,7 @@ private:
 			else if((ec.value() == boost::asio::error::eof) || (ec.value() == boost::asio::error::connection_reset))
 			{
 				char strVal[200] = { 0 };
-				sprintf_s(strVal, "Read Error, Code: %d, Message: ", ec.value());
+				sprintf(strVal, "Read Error, Code: %d, Message: ", ec.value());
 				ThreadSafeOutput(strVal + ec.message());
 				self->Close();
 			}
@@ -213,7 +213,7 @@ private:
 				_pSocketSession->getSocket().remote_endpoint().address(v4address);
 
 				char charTMP[200];
-				sprintf_s(charTMP, "Accepted, IP:%s, Port:%d", v4address.to_string().c_str(), _pSocketSession->getSocket().remote_endpoint().port());
+				sprintf(charTMP, "Accepted, IP:%s, Port:%d", v4address.to_string().c_str(), _pSocketSession->getSocket().remote_endpoint().port());
 				ThreadSafeOutput(std::string(charTMP));
 				
 				_pSocketSession->start();
@@ -242,16 +242,14 @@ static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialDa
 	//ThreadSafeOutput(std::string("Serial Data \r\n"));
 
 	std::time_t t = std::time(NULL);
-	struct tm now;
+	struct tm *now;
 	char mbstr[100];
-	::localtime_s(&now, &t);
-	std::strftime(mbstr, sizeof(mbstr), "%T R: ", &now);
+	now = localtime(&t);
+	std::strftime(mbstr, sizeof(mbstr), "%T R: ", now);
 
-	char strLen[20] = { 0 };
-	::_itoa_s(tmp.getLength(), strLen, 10);
-
-	strTMP = std::string(mbstr) + std::string(strLen);
-	ThreadSafeOutput(strTMP.c_str());
+	char strLog[200] = { 0 };
+    sprintf(strLog, "%s%d", mbstr, iLen);
+	ThreadSafeOutput(strLog);
 
 	return 0;
 }
@@ -283,45 +281,37 @@ int main(int argc, char* argv[])
 		std::thread writeCOMThread([&sp]() {
 			while (true)
 			{
-				//在这里找到需要删除的Session~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!!! 2016-08-03
+				//脭脷脮芒脌茂脮脪碌陆脨猫脪陋脡戮鲁媒碌脛Session~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!!! 2016-08-03
 
 				CCharArray data = Net2SerialBuffer.get_pop();
 				
 				//Erase the element in the sessionVector
 				if (strncmp(disconnectFlag.c_str(), data.getPtr(), disconnectFlag.size()) == 0)
 				{
-					int iCountTmp = 0;
-
 					boost::mutex::scoped_lock	lock(cv_mutex);
 
 					ThreadSafeOutput("Removed Session");
-					for each (auto sess in sessionVector)
+					for(unsigned int iCount = 0; iCount < sessionVector.size(); iCount ++)
 					{
-						if (sess->getSocketHash() == data.getHash())
+						if (sessionVector[iCount]->getSocketHash() == data.getHash())
 						{
-							sessionVector.erase(sessionVector.begin() + iCountTmp);
-							//char charTMP[200] = { 0 };
-							//sprintf_s(charTMP, "Hash: %020lld, Current: %zd", sess->getSocketHash(), sessionVector.size());
-							//ThreadSafeOutput(charTMP);
+							sessionVector.erase(sessionVector.begin() + iCount);
 							break;
 						}
-						iCountTmp++;
 					}
 				}
 
 				sp->Write2Serial(data.getHash(), (unsigned char *)(data.getPtr()), data.getLength());
 
 				std::time_t t = std::time(NULL);
-				struct tm now;
+				struct tm *now;
 				char mbstr[100];
-				::localtime_s(&now, &t);
-				std::strftime(mbstr, sizeof(mbstr), "%T W: ", &now);
+				now = localtime(&t);
+				std::strftime(mbstr, sizeof(mbstr), "%T W: ", now);
 
-				char strLen[20] = { 0 };
-				::_itoa_s(data.getLength(), strLen, 10);
-
-				strTMP = std::string(mbstr) + std::string(strLen);
-				ThreadSafeOutput(strTMP.c_str());
+				char strLog[200] = { 0 };
+				sprintf(strLog, "%s%d", mbstr, data.getLength());
+				ThreadSafeOutput(strLog);
 			}
 		});
 
@@ -343,11 +333,11 @@ int main(int argc, char* argv[])
 					//Lock the sessionVector and get the current SocketSession
 					boost::mutex::scoped_lock	lock(cv_mutex);
 
-					for each (auto sess in sessionVector)
+					for(unsigned int iCount = 0; iCount < sessionVector.size(); iCount ++)
 					{
-						if (sess->getSocketHash() == data.getHash())
+						if (sessionVector[iCount]->getSocketHash() == data.getHash())
 						{
-							pTMP = sess;
+							pTMP = sessionVector[iCount];
 							bFind = true;
 							break;
 						}

@@ -1,0 +1,8 @@
+.PHONY: clean All
+
+All:
+	@echo "----------Building project:[ Net2USB_Client - Debug ]----------"
+	@$(MAKE) -f  "Net2USB_Client.mk"
+clean:
+	@echo "----------Cleaning project:[ Net2USB_Client - Debug ]----------"
+	@$(MAKE) -f  "Net2USB_Client.mk" clean

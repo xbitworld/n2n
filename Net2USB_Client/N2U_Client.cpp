@@ -14,6 +14,7 @@
 #include <iostream>
 #include <thread>
 #include <iomanip> 
+#include <algorithm>
 
 #include "N2U_Client.h"
 #include "../CTMutexSet.h"
@@ -36,7 +37,6 @@ class CommPair
 public:
 	CommPair() {}
 
-	std::shared_ptr<std::thread> pTH;
 	size_t serverHash;
 	dtCSC::CSocketClient* pClientSocket;
 };
@@ -107,23 +107,30 @@ static void writeNetData(ClassMutexList<CCharArray> &dataList)
 	{
 		CCharArray tempData = dataList.get_pop();
 
-		boost::mutex::scoped_lock	lock(cv_mutex);
 
 		bool bFind = false;
+		CommPair tempObj;
 
-		for each (auto commTMP in commVector)
-		{
-			if (commTMP.serverHash == tempData.getHash())
+		{//Avoid lock too long
+			boost::mutex::scoped_lock	lock(cv_mutex);
+			for(unsigned int iLoop = 0; iLoop < commVector.size(); iLoop ++)
 			{
-				commTMP.pClientSocket->write(tempData.getPtr(), tempData.getLength());
-				bFind = true;
-				break;
+				if(commVector[iLoop].serverHash == tempData.getHash())
+				{
+					tempObj = commVector[iLoop];
+					bFind = true;
+					break;
+				}
 			}
 		}
 
 		if (!bFind)
 		{
 			ThreadSafeOutput("Didn't find CommObj");
+		}
+		else
+		{
+			tempObj.pClientSocket->write(tempData.getPtr(), tempData.getLength());
 		}
 	}
 }
@@ -149,9 +156,6 @@ void socketConnect()
 
 	while (true)
 	{
-		size_t addHash = 0;
-		size_t rmvHash = 0;
-
 		CHashMark hashObj = HashList.get_pop();
 
 		if(hashObj.add_rmv)
@@ -169,26 +173,28 @@ void socketConnect()
 			commVector.push_back(commObj);
 
 			char strEvent[100];
-			sprintf_s(strEvent, "Current: %zd", commVector.size());
+			sprintf(strEvent, "Current: %zd", commVector.size());
 			ThreadSafeOutput("Add commVector" + std::string(strEvent));
 		}
 		else
 		{//Remove thread
-			int iCount = 0;
+			unsigned int iCount = 0;
+			size_t size_current;
 			bool bFind = false;
 			CommPair commObj;
 
-			{//Avoid lock commVector too long
+			{//Avoid lock too long
 				boost::mutex::scoped_lock	lock(cv_mutex);
-				for each (auto tmpObj in commVector)
+				for(iCount = 0; iCount < commVector.size(); iCount ++)
 				{
-					if (tmpObj.serverHash == hashObj.hash)
+					if(commVector[iCount].serverHash == hashObj.hash)
 					{
-						commObj = tmpObj;
+						commObj = commVector[iCount];
+						commVector.erase(commVector.begin() + iCount);
+						size_current = commVector.size();
 						bFind = true;
 						break;
 					}
-					iCount++;
 				}
 			}
 
@@ -196,10 +202,8 @@ void socketConnect()
 			{
 				delete commObj.pClientSocket;
 
-				commVector.erase(commVector.begin() + iCount);
-
 				char strEvent[100];
-				sprintf_s(strEvent, "Current: %zd", commVector.size());
+				sprintf(strEvent, "Current: %zd", size_current);
 				ThreadSafeOutput("Erase commVector, " + std::string(strEvent));
 			}
 		}
@@ -236,32 +240,25 @@ static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialDa
 
 	}
 	//DisplayHEX((const char *)("Serial: "), tmp.getPtr(), iLen);
-	std::string lstrTMP;
+	char strLog[200];
 
 	std::time_t t = std::time(NULL);
-	struct tm now;
+	struct tm *now;
 	char mbstr[100];
-	::localtime_s(&now, &t);
-	std::strftime(mbstr, sizeof(mbstr), "%T", &now);
+	now = localtime(&t);
+	std::strftime(mbstr, sizeof(mbstr), "%T", now);
 
 	if (iEvent != 0)
 	{
-		char strEvent[100];
-		sprintf_s(strEvent, "%s, Event: %d, Current: %zd", mbstr, iEvent, commVector.size());
-		lstrTMP = std::string(strEvent);
+		sprintf(strLog, "%s, Event: %d, Current: %zd", mbstr, iEvent, commVector.size());
 	}
 	else
 	{
 		Serial2NetBuffer.put(tmp);
-		//ThreadSafeOutput(std::string("Serial Data\r\n"));// +std::string(tmp.getPtr()));
-
-		char strLen[100] = { 0 };
-		::_itoa_s(tmp.getLength(), strLen, 10);
-
-		lstrTMP = std::string(mbstr) + " R: " + std::string(strLen);
+		sprintf(strLog, "%s R: %d", mbstr, tmp.getLength());
 	}
 
-	ThreadSafeOutput(lstrTMP);
+	ThreadSafeOutput(strLog);
 
 	return 0;
 }
@@ -301,16 +298,14 @@ int main(int argc, char* argv[])
 				sp->Write2Serial(data.getHash(), (unsigned char *)(data.getPtr()), data.getLength());
 
 				std::time_t t = std::time(NULL);
-				struct tm now;
+				struct tm *now;
 				char mbstr[100];
-				::localtime_s(&now, &t);
-				std::strftime(mbstr, sizeof(mbstr), "%T W: ", &now);
+				now = localtime(&t);
+				std::strftime(mbstr, sizeof(mbstr), "%T W: ", now);
 
-				char strLen[20] = { 0 };
-				::_itoa_s(data.getLength(), strLen, 10);
-
-				std::string strLog = std::string(mbstr) + std::string(strLen);
-				ThreadSafeOutput(strLog.c_str());
+				char strLog[200];
+				sprintf(strLog, "%s%d", mbstr, data.getLength());
+				ThreadSafeOutput(strLog);
 			}
 		});
 		

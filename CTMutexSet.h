@@ -238,7 +238,7 @@ public:
 		int iCounter = full;
 		return iCounter;
 	}
-	//²âÊÔlock~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!!!!!!!!!!!!!!!!!!!!!!!
+	//Â²Ã¢ÃŠÃ”lock~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!!!!!!!!!!!!!!!!!!!!!!!
 	void lock()
 	{
 		mutex.lock();
@@ -253,7 +253,7 @@ private:
 	boost::condition cond;
 	unsigned int full;
 	std::list<T> TList;
-	int iBUF_SIZE;
+	unsigned int iBUF_SIZE;
 };
 
 #endif
