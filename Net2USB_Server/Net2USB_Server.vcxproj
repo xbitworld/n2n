@@ -27,22 +27,22 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v120</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v120</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -64,14 +64,20 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <LibraryPath>$(LibraryPath)</LibraryPath>
+    <LibraryPath>D:\D\boost_1_61_0\bin.v2\libs\system\build\msvc-12.0\debug\link-static\threading-multi;D:\D\boost_1_61_0\bin.v2\libs\date_time\build\msvc-12.0\debug\link-static\threading-multi;D:\D\boost_1_61_0\bin.v2\libs\regex\build\msvc-12.0\debug\link-static\threading-multi;D:\D\boost_1_61_0\bin.v2\libs\thread\build\msvc-12.0\debug\link-static\threading-multi;D:\D\boost_1_61_0\bin.v2\libs\chrono\build\msvc-12.0\debug\link-static\threading-multi;D:\D\boost_1_61_0\bin.v2\libs\program_options\build\msvc-12.0\debug\link-static\threading-multi;$(LibraryPath)</LibraryPath>
+    <IncludePath>D:\D\boost_1_61_0;$(IncludePath);$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>true</LinkIncremental>
+    <IncludePath>D:\D\boost_1_61_0;$(IncludePath);$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <LibraryPath>D:\D\boost_1_61_0\bin.v2\libs\system\build\msvc-12.0\release\link-static\threading-multi;D:\D\boost_1_61_0\bin.v2\libs\date_time\build\msvc-12.0\release\link-static\threading-multi;D:\D\boost_1_61_0\bin.v2\libs\regex\build\msvc-12.0\release\link-static\threading-multi;D:\D\boost_1_61_0\bin.v2\libs\thread\build\msvc-12.0\release\link-static\threading-multi;D:\D\boost_1_61_0\bin.v2\libs\chrono\build\msvc-12.0\release\link-static\threading-multi;D:\D\boost_1_61_0\bin.v2\libs\program_options\build\msvc-12.0\release\link-static\threading-multi;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>C:\boost_1_61_0;$(IncludePath)</IncludePath>
+    <IncludePath>$(IncludePath)</IncludePath>
     <LibraryPath>C:\boost_1_61_0\lib64-msvc-14.0;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -111,15 +117,20 @@
     </Link>
     <ClCompile>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>E:\boost_1_61_0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>E:\boost_1_61_0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\ASIOLib\Executor.cpp" />
+    <ClCompile Include="..\ASIOLib\Executor.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
     <ClCompile Include="..\ASIOLib\SerialPort.cpp" />
     <ClCompile Include="..\ASIOLib\SerialRW.cpp" />
     <ClCompile Include="N2U_Server.cpp" />

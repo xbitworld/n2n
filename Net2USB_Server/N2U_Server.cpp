@@ -124,14 +124,14 @@ public:
 		socket_hash = hash_socket(socket_.remote_endpoint().port());
 		if (!ec)
 		{
-			sprintf(charTMP, "IP:%s, Port:%d", v4address.to_string().c_str(), socket_.remote_endpoint().port());
+						sprintf_s(charTMP, "IP:%s, Port:%d", v4address.to_string().c_str(), socket_.remote_endpoint().port());
 			socket_.cancel();
 			socket_.close();
 			ThreadSafeOutput(std::string(charTMP) + std::string(", Disconnected"));
 		}
 		else
 		{
-			sprintf(charTMP, "Close Error, Code: %d, Message: ", ec.value());
+						sprintf_s(charTMP, "Close Error, Code: %d, Message: ", ec.value());
 			ThreadSafeOutput(charTMP + ec.message());
 		}
 
@@ -147,7 +147,7 @@ public:
 			if ((ec.value() == boost::asio::error::eof) || (ec.value() == boost::asio::error::connection_reset))
 			{
 				char strVal[200] = { 0 };
-				sprintf(strVal, "Write Error, Code: %d, Message: ", ec.value());
+							sprintf_s(strVal, "Write Error, Code: %d, Message: ", ec.value());
 				ThreadSafeOutput(strVal + ec.message());
 				self->Close();
 			}
@@ -169,7 +169,7 @@ private:
 			else if((ec.value() == boost::asio::error::eof) || (ec.value() == boost::asio::error::connection_reset))
 			{
 				char strVal[200] = { 0 };
-				sprintf(strVal, "Read Error, Code: %d, Message: ", ec.value());
+							sprintf_s(strVal, "Read Error, Code: %d, Message: ", ec.value());
 				ThreadSafeOutput(strVal + ec.message());
 				self->Close();
 			}
@@ -213,7 +213,7 @@ private:
 				_pSocketSession->getSocket().remote_endpoint().address(v4address);
 
 				char charTMP[200];
-				sprintf(charTMP, "Accepted, IP:%s, Port:%d", v4address.to_string().c_str(), _pSocketSession->getSocket().remote_endpoint().port());
+							sprintf_s(charTMP, "Accepted, IP:%s, Port:%d", v4address.to_string().c_str(), _pSocketSession->getSocket().remote_endpoint().port());
 				ThreadSafeOutput(std::string(charTMP));
 				
 				_pSocketSession->start();
@@ -244,11 +244,11 @@ static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialDa
 	std::time_t t = std::time(NULL);
 	struct tm *now;
 	char mbstr[100];
-	now = localtime(&t);
+	localtime_s(now, &t);
 	std::strftime(mbstr, sizeof(mbstr), "%T R: ", now);
 
 	char strLog[200] = { 0 };
-    sprintf(strLog, "%s%d", mbstr, iLen);
+    			sprintf_s(strLog, "%s%d", mbstr, iLen);
 	ThreadSafeOutput(strLog);
 
 	return 0;
@@ -306,11 +306,11 @@ int main(int argc, char* argv[])
 				std::time_t t = std::time(NULL);
 				struct tm *now;
 				char mbstr[100];
-				now = localtime(&t);
+				localtime_s(now, &t);
 				std::strftime(mbstr, sizeof(mbstr), "%T W: ", now);
 
 				char strLog[200] = { 0 };
-				sprintf(strLog, "%s%d", mbstr, data.getLength());
+							sprintf_s(strLog, "%s%d", mbstr, data.getLength());
 				ThreadSafeOutput(strLog);
 			}
 		});

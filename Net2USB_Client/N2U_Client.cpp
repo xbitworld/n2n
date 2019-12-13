@@ -173,7 +173,7 @@ void socketConnect()
 			commVector.push_back(commObj);
 
 			char strEvent[100];
-			sprintf(strEvent, "Current: %zd", commVector.size());
+						sprintf_s(strEvent, "Current: %zd", commVector.size());
 			ThreadSafeOutput("Add commVector" + std::string(strEvent));
 		}
 		else
@@ -203,7 +203,7 @@ void socketConnect()
 				delete commObj.pClientSocket;
 
 				char strEvent[100];
-				sprintf(strEvent, "Current: %zd", size_current);
+							sprintf_s(strEvent, "Current: %zd", size_current);
 				ThreadSafeOutput("Erase commVector, " + std::string(strEvent));
 			}
 		}
@@ -243,19 +243,19 @@ static int getSerialData(size_t Hash, const std::vector<unsigned char> &SerialDa
 	char strLog[200];
 
 	std::time_t t = std::time(NULL);
-	struct tm *now;
+	struct tm *now = NULL;
 	char mbstr[100];
-	now = localtime(&t);
+	localtime_s(now, &t);
 	std::strftime(mbstr, sizeof(mbstr), "%T", now);
 
 	if (iEvent != 0)
 	{
-		sprintf(strLog, "%s, Event: %d, Current: %zd", mbstr, iEvent, commVector.size());
+					sprintf_s(strLog, "%s, Event: %d, Current: %zd", mbstr, iEvent, commVector.size());
 	}
 	else
 	{
 		Serial2NetBuffer.put(tmp);
-		sprintf(strLog, "%s R: %d", mbstr, tmp.getLength());
+					sprintf_s(strLog, "%s R: %d", mbstr, tmp.getLength());
 	}
 
 	ThreadSafeOutput(strLog);
@@ -298,13 +298,13 @@ int main(int argc, char* argv[])
 				sp->Write2Serial(data.getHash(), (unsigned char *)(data.getPtr()), data.getLength());
 
 				std::time_t t = std::time(NULL);
-				struct tm *now;
+				struct tm *now = NULL;
 				char mbstr[100];
-				now = localtime(&t);
+				localtime_s(now, &t);
 				std::strftime(mbstr, sizeof(mbstr), "%T W: ", now);
 
 				char strLog[200];
-				sprintf(strLog, "%s%d", mbstr, data.getLength());
+							sprintf_s(strLog, "%s%d", mbstr, data.getLength());
 				ThreadSafeOutput(strLog);
 			}
 		});
